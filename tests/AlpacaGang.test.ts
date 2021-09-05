@@ -289,8 +289,8 @@ describe("AlpacaGang", () => {
         await alpacaGang.rawFulfillRandomness(requestIds[0], 100)
 
         // Claim 1 Alpaca, VRF fulfill with randomness = 100
-        //  the following states should be satisfy:
-        // - Deployer should AlpacaGang's balance should be 1
+        //  the following states should be satisfied:
+        // - AlpacaGang's AG balance should be 1
         // - Deployer should get AlpacaGang ID 0 to his wallet
         // - freeLength should be MAX_ALPACAS - 1
         await alpacaGang.claim(requestIds)
@@ -311,8 +311,8 @@ describe("AlpacaGang", () => {
         await alpacaGang.rawFulfillRandomness(requestIds[0], 19)
 
         // Claim 1 Alpaca, VRF fulfill with randomness = 19
-        //  the following states should be satisfy:
-        // - Deployer should AlpacaGang's balance should be 2
+        //  the following states should be satisfied:
+        // - Deployer's AG balance should be 2
         // - Deployer should has TokenID [0, 19] to his wallet
         // - freeLength should be MAX_ALPACAS - 2
         await alpacaGang.claim(requestIds)
@@ -342,9 +342,9 @@ describe("AlpacaGang", () => {
         )
 
         // Claim 10 Alpaca
-        //  the following states should be satisfy:
-        // - Deployer should AlpacaGang's balance should be 2 + 10 = 12
-        // - AlpacaGang should has MAX_ALPACAS - 12
+        //  the following states should be satisfied:
+        // - Deployer's AG balance should be 2 + 10 = 12
+        // - AlpacaGang should have MAX_ALPACAS - 12
         // - freeLength should be MAX_ALPACAS - 12
         await alpacaGang.claim(requestIds.slice(0, 10))
         expect(await alpacaGang.balanceOf(deployerAddress)).to.be.eq(12)
@@ -353,9 +353,9 @@ describe("AlpacaGang", () => {
         expect(await alpacaGang.reserveCount()).to.be.eq(20)
 
         // Claim 8 Alpaca.
-        // The following states should be satisfy:
-        // - Deployer should AlpacaGang's balance should be 12 + 8 = 20
-        // - AlpacaGang should has MAX_ALPACAS - 20
+        // The following states should be satisfied:
+        // - AlpacaGang's AG balance should be 12 + 8 = 20
+        // - AlpacaGang should have MAX_ALPACAS - 20
         // - freeLength should be MAX_ALPACAS - 20
         await alpacaGang.claim(requestIds.slice(10, requestIds.length))
         expect(await alpacaGang.balanceOf(deployerAddress)).to.be.eq(20)
@@ -503,7 +503,7 @@ describe("AlpacaGang", () => {
         expect((await alpacaGang.rands(requestIds[0])).isFulfilled).to.be.eq(1)
 
         // Deployer claims requestIds[0]
-        // The following states should be satisfy:
+        // The following states should be satisfied:
         // - Deployer's AlpacaGang balance should be 1
         // - Deployer should get AlpacaGang ID 0 to his wallet
         // - freeLength should be MAX_ALPACAS - 1
@@ -518,7 +518,7 @@ describe("AlpacaGang", () => {
 
         // Somehow Chainlink VRF cannot fulfilled other requests within 100 blocks from mint
         // Deployer should has the right to refund the purchase.
-        // The following states should be satisfy:
+        // The following states should be satisfied:
         // - Deployer's AlpacaGang balance should still be 1
         // - Deployer should still has ID#0 in his wallet
         // - freeLength should remain the same as token never get transferred out of AlpacaGang yet
@@ -564,9 +564,9 @@ describe("AlpacaGang", () => {
         )
 
         // Claim 10 Alpaca
-        //  the following states should be satisfy:
-        // - Deployer should AlpacaGang's balance should be 1 + 10 = 11
-        // - AlpacaGang should has MAX_ALPACAS - 11
+        //  the following states should be satisfied:
+        // - AlpacaGang's AG balance should be 1 + 10 = 11
+        // - AlpacaGang should have MAX_ALPACAS - 11
         // - freeLength should be MAX_ALPACAS - 11
         await alpacaGang.claim(requestIds.slice(0, 10), { gasPrice: 0 })
         expect(await alpacaGang.balanceOf(deployerAddress)).to.be.eq(11)
@@ -576,9 +576,9 @@ describe("AlpacaGang", () => {
         expect(await ethers.provider.getBalance(alpacaGang.address)).to.be.eq(ALPACA_GANG_PRICE.mul(20))
 
         // Claim 9 Alpaca.
-        // The following states should be satisfy:
-        // - Deployer should AlpacaGang's balance should be 11 + 9 = 20
-        // - AlpacaGang should has MAX_ALPACAS - 20
+        // The following states should be satisfied:
+        // - AlpacaGang's AG balance should be 11 + 9 = 20
+        // - AlpacaGang should have MAX_ALPACAS - 20
         // - freeLength should be MAX_ALPACAS - 20
         await alpacaGang.claim(requestIds.slice(10, requestIds.length), { gasPrice: 0 })
         expect(await alpacaGang.balanceOf(deployerAddress)).to.be.eq(20)
