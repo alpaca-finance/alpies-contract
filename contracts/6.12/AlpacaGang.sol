@@ -21,8 +21,6 @@ import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
 
 import "./SafeToken.sol";
 
-import "hardhat/console.sol";
-
 contract AlpacaGang is VRFConsumerBase, ERC721, Ownable, ReentrancyGuard {
   /// @dev constants
   uint256 public constant ALPACA_GANG_PRICE = 1680000000000000000;
