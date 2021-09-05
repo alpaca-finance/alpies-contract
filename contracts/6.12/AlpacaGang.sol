@@ -42,6 +42,7 @@ contract AlpacaGang is VRFConsumerBase, ERC721, Ownable, ReentrancyGuard {
 
   mapping(bytes32 => address) public requestOwner;
   mapping(bytes32 => Rand) public rands;
+  mapping(bytes32 => uint256) public requestAt;
 
   struct Rand {
     uint256 result;
@@ -52,6 +53,7 @@ contract AlpacaGang is VRFConsumerBase, ERC721, Ownable, ReentrancyGuard {
   event PreMint(address caller, uint256 preMintCount, uint256 preMintAmount);
   event Mint(address indexed caller, bytes32 indexed requestId);
   event Claim(address indexed caller, bytes32 indexed requestId, uint256 tokenId);
+  event Refund(address indexed caller, bytes32 indexed requestId);
 
   constructor(
     string memory _name,
@@ -107,37 +109,34 @@ contract AlpacaGang is VRFConsumerBase, ERC721, Ownable, ReentrancyGuard {
   /// @dev Mint Alpaca Gang. Request Chainlink's VRF for random number.
   /// Users will need to call "claim" to get the actual art from the collection.
   /// @param amount The amount of tokens that users wish to buy
-  function mint(uint256 amount) external payable nonReentrant returns (bytes32[] memory) {
+  function mint(uint256 amount) external payable nonReentrant {
     require(block.number > startBlock && preMintCount == maxAlpacas, "!sale start");
     require(amount <= MAX_ALPACA_PURCHASE, "amount > MAX_ALPACA_PURCHASE");
     require(SafeMath.add(reserveCount, amount) <= maxAlpacas, "sold out");
     require(SafeMath.mul(ALPACA_GANG_PRICE, amount) <= msg.value, "insufficent funds");
     require(LINK.balanceOf(address(this)) >= vrfFee, "not enough LINK");
 
-    bytes32[] memory requestIds = new bytes32[](amount);
-    bytes32 requestId;
     for (uint256 i = 0; i < amount; i++) {
-      requestId = requestRandomness(keyHash, vrfFee);
+      bytes32 requestId = requestRandomness(keyHash, vrfFee);
 
       // Sanity check. Revert if requestId collision
       require(requestOwner[requestId] == address(0), "requestId collision");
+      require(requestAt[requestId] == 0, "requestId collision");
 
-      // Assign requestId to its owner
+      // Assign requestId to owner and requestAt to current block
       requestOwner[requestId] = msg.sender;
-      requestIds[i] = requestId;
+      requestAt[requestId] = block.number;
 
       emit Mint(msg.sender, requestId);
     }
 
-    reserveCount = reserveCount + amount;
-
-    return requestIds;
+    reserveCount = SafeMath.add(reserveCount, amount);
   }
 
   /// @dev Claim Alpaca Gang. Decided which Token ID that user get.
   /// @param requestIds The requestIds that users wish to claim
   function claim(bytes32[] memory requestIds) external nonReentrant {
-    require(requestIds.length <= 10, "requestIds.length > 10");
+    require(requestIds.length <= MAX_ALPACA_PURCHASE, "bad len(requestIds)");
     for (uint256 i = 0; i < requestIds.length; i++) {
       require(requestOwner[requestIds[i]] == msg.sender, "!request owner");
       require(rands[requestIds[i]].isFulfilled == 1, "!request fulfilled");
@@ -147,16 +146,42 @@ contract AlpacaGang is VRFConsumerBase, ERC721, Ownable, ReentrancyGuard {
       // Optimistically transfer ownership to user first
       uint256 tokenId = freeAlpacas[index];
       _transfer(address(this), msg.sender, freeAlpacas[index]);
-      // Remove from double-link list
+      // Remove index from array
       _removeFromFree(index);
 
       // release requestId and its rands
       requestOwner[requestIds[i]] = address(0);
+      requestAt[requestIds[i]] = 0;
       rands[requestIds[i]].result = 0;
       rands[requestIds[i]].isFulfilled = 0;
 
       emit Claim(msg.sender, requestIds[i], tokenId);
     }
+  }
+
+  /// @dev Refund request that not get fulfilled after 100 blocks away from "mint"
+  function refund(bytes32[] memory requestIds) external nonReentrant {
+    require(requestIds.length <= MAX_ALPACA_PURCHASE, "bad len(requestIds)");
+    for (uint256 i = 0; i < requestIds.length; i++) {
+      require(requestOwner[requestIds[i]] == msg.sender, "!request owner");
+      require(SafeMath.sub(block.number, requestAt[requestIds[i]]) > 100, "!100 blocks away");
+      require(rands[requestIds[i]].isFulfilled == 0, "request fulfilled");
+
+      // release requestId and its rands
+      requestOwner[requestIds[i]] = address(0);
+      requestAt[requestIds[i]] = 0;
+      rands[requestIds[i]].result = 0;
+      rands[requestIds[i]].isFulfilled = 0;
+
+      emit Refund(msg.sender, requestIds[i]);
+    }
+
+    // decrease reserveCount as user release his rights, hence
+    // other users should be able to mint.
+    reserveCount = SafeMath.sub(reserveCount, requestIds.length);
+
+    // Refund $$$ back to user
+    SafeToken.safeTransferETH(msg.sender, SafeMath.mul(ALPACA_GANG_PRICE, requestIds.length));
   }
 
   /// @dev Return freeAlpacasLength
