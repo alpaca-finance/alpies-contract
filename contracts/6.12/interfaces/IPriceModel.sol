@@ -13,7 +13,7 @@ Alpaca Fin Corporation
 
 pragma solidity 0.6.12;
 
-interface IPriceModel {
+interface IPriceModel {  
   /// @dev Get current price per token
   function price() view;
 }
