@@ -15,5 +15,5 @@ pragma solidity 0.6.12;
 
 interface IPriceModel {  
   /// @dev Get current price per token
-  function price() view;
+  function price() external view returns (uint256);
 }

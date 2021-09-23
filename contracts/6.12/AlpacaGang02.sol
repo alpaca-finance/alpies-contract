@@ -17,9 +17,9 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./SafeToken.sol";
+import "./utils/SafeToken.sol";
 
-import "../interfaces/IPriceModel.sol";
+import "./interfaces/IPriceModel.sol";
 
 contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
   /// @dev constants
@@ -33,13 +33,13 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
   IPriceModel public priceModel;
 
   /// @dev event
-  event Mint(address indexed caller, bytes32 indexed requestId);
+  event Mint(address indexed caller, uint256 indexed tokenId);
 
   constructor(
     string memory _name,
     string memory _symbol,
     uint256 _maxAlpacas,
-    uint256 _startBlock,
+    uint256 _startBlock
   ) public ERC721(_name, _symbol) {
     startBlock = _startBlock;
     maxAlpacas = _maxAlpacas;
@@ -61,14 +61,13 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     require(SafeMath.add(reserveCount, amount) <= maxAlpacas, "sold out");
     
     // TODO: Need to get price from model
-    require(SafeMath.mul(ALPACA_GANG_PRICE, amount) <= msg.value, "insufficent funds");
+    uint256 pricePerToken = 0;
+    require(SafeMath.mul(pricePerToken, amount) <= msg.value, "insufficent funds");
 
     for (uint256 i = 0; i < amount; i++) {
-      bytes32 requestId = requestRandomness(keyHash, vrfFee);
-
       // TODO: mint logic here
-
-      emit Mint(msg.sender, requestId);
+      _mint(address(this), i);
+      emit Mint(msg.sender, i);
     }
 
     reserveCount = SafeMath.add(reserveCount, amount);

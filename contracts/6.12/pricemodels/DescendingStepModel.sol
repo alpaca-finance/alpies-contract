@@ -13,7 +13,7 @@ Alpaca Fin Corporation
 
 pragma solidity 0.6.12;
 
-import "./SafeToken.sol";
+import "../utils/SafeToken.sol";
 import "../interfaces/IPriceModel.sol";
 
 
@@ -29,15 +29,15 @@ contract DescendingStepModel is IPriceModel {
   uint256 public priceFloor;
 
   /// @dev Get current price per token
-  function price() view {
+  function price() override external view returns (uint256) {
     if (block.number <= startBlock) return startPrice;
     // This should prevent overflow
     if (block.number >= endBlock) return priceFloor;
 
     // TODO: need safe math here?
-    uint256 memory priceDelta = ((block.number - startBlock) / blockPerStep) * priceStep;
+    uint256 priceDelta = ((block.number - startBlock) / blockPerStep) * priceStep;
     
-    uint256 memory updatedPrice = startPrice - priceDelta;
+    uint256 updatedPrice = startPrice - priceDelta;
 
     if (updatedPrice < priceFloor) return priceFloor;
 

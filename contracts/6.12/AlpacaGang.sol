@@ -19,7 +19,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
 
-import "./SafeToken.sol";
+import "./utils/SafeToken.sol";
 
 contract AlpacaGang is VRFConsumerBase, ERC721, Ownable, ReentrancyGuard {
   /// @dev constants
