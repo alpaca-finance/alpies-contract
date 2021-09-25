@@ -16,7 +16,6 @@ pragma solidity 0.6.12;
 import "../utils/SafeToken.sol";
 import "../interfaces/IPriceModel.sol";
 
-
 contract DescendingStepModel is IPriceModel {
 
   /// @dev states
@@ -27,6 +26,25 @@ contract DescendingStepModel is IPriceModel {
   
   uint256 public startPrice;
   uint256 public priceFloor;
+
+  constructor(
+    uint256 _startBlock,
+    uint256 _endBlock,
+    uint256 _blockPerStep,
+    uint256 _priceStep,
+    uint256 _startPrice,
+    uint256 _priceFloor
+  ) public {
+    require(_endBlock > _startBlock, "end block < start block");
+    require(_startPrice > _priceFloor, "floor price > start price");
+  
+    startBlock = _startBlock;
+    endBlock = _endBlock;
+    blockPerStep = _blockPerStep;
+    priceStep = _priceStep;
+    startPrice = _startPrice;
+    priceFloor = _priceFloor;
+  }
 
   /// @dev Get current price per token
   function price() override external view returns (uint256) {

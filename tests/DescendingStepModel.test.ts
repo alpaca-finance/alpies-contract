@@ -11,6 +11,10 @@ const { expect } = chai
 const { AddressZero } = ethers.constants
 const { parseEther, formatBytes32String } = ethers.utils
 
+const BLOCKPERSTEP = 10
+const PRICESTEP = ethers.utils.parseEther("0.1")
+const STARTPRICE = ethers.utils.parseEther("1")
+const FLOORPRICE = ethers.utils.parseEther("0.5")
 type fixture = {
   descendingStepModel: DescendingStepModel
 }
@@ -19,14 +23,24 @@ type fixture = {
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
+  const startBlock = (await latestBlockNumber())
+  const endBlock = (await latestBlockNumber()).add(1000)
+
   const DescendingStepModel = (await ethers.getContractFactory("DescendingStepModel", deployer)) as DescendingStepModel__factory
-  const descendingStepModel = await DescendingStepModel.deploy()
+  const descendingStepModel = await DescendingStepModel.deploy(
+    startBlock,
+    endBlock,
+    BLOCKPERSTEP,
+    PRICESTEP,
+    STARTPRICE,
+    FLOORPRICE
+  )
   await descendingStepModel.deployed()
 
   return { descendingStepModel }
 }
 
-describe("AlpacaGang", () => {
+describe("Desending Price Model", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
@@ -43,25 +57,105 @@ describe("AlpacaGang", () => {
   let descendingStepModel: DescendingStepModel
 
   // Signer
-  let alpacaGangAsAlice: DescendingStepModel
-  let alpacaGangAsBob: DescendingStepModel
+  let priceModelAsAlice: DescendingStepModel
+  let priceModelAsBob: DescendingStepModel
 
-  beforeEach(async () => {
-    ; ({ descendingStepModel } = await waffle.loadFixture(loadFixtureHandler))
-      ;[deployer, alice, bob, dev] = await ethers.getSigners()
-      ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
-        deployer.getAddress(),
-        alice.getAddress(),
-        bob.getAddress(),
-        dev.getAddress(),
-      ])
+  context("Bad params constractor", async () => {
 
-    alpacaGangAsAlice = DescendingStepModel__factory.connect(descendingStepModel.address, alice) as DescendingStepModel
+    describe("both price and block number are wrong", async () => {
+      it("should revert", async() => {
+        const [deployer] = await ethers.getSigners()
+  
+        const DescendingStepModel = (await ethers.getContractFactory("DescendingStepModel", deployer)) as DescendingStepModel__factory
+        
+        const startBlock = (await latestBlockNumber()).add(1000)
+        const endBlock = (await latestBlockNumber())
+        const blockPerStep = 10
+        const priceStep = ethers.utils.parseEther("0.1")
+        const startPrice = ethers.utils.parseEther("0.5")
+        const floorPrice = ethers.utils.parseEther("1")
+
+        
+        await expect(DescendingStepModel.deploy(
+          startBlock,
+          endBlock,
+          blockPerStep,
+          priceStep,
+          startPrice,
+          floorPrice
+        )).to.be.revertedWith("end block < start block")
+      })
+    })
+
+    describe("end block < start block", async () => {
+      it("should revert", async() => {
+        const [deployer] = await ethers.getSigners()
+  
+        const DescendingStepModel = (await ethers.getContractFactory("DescendingStepModel", deployer)) as DescendingStepModel__factory
+  
+        const startBlock = (await latestBlockNumber()).add(1000)
+        const endBlock = (await latestBlockNumber())
+        const blockPerStep = 10
+        const priceStep = ethers.utils.parseEther("0.1")
+        const startPrice = ethers.utils.parseEther("1")
+        const floorPrice = ethers.utils.parseEther("0.5")
+
+        
+        await expect(DescendingStepModel.deploy(
+          startBlock,
+          endBlock,
+          blockPerStep,
+          priceStep,
+          startPrice,
+          floorPrice
+        )).to.be.revertedWith("end block < start block")
+      })
+    })
+
+    describe("floor price > start price", async () => {
+      it("should revert", async() => {
+        const [deployer] = await ethers.getSigners()
+  
+        const DescendingStepModel = (await ethers.getContractFactory("DescendingStepModel", deployer)) as DescendingStepModel__factory
+  
+        const startBlock = (await latestBlockNumber())
+        const endBlock = (await latestBlockNumber()).add(1000)
+        const blockPerStep = 10
+        const priceStep = ethers.utils.parseEther("0.1")
+        const startPrice = ethers.utils.parseEther("0.5")
+        const floorPrice = ethers.utils.parseEther("1")
+
+        
+        await expect(DescendingStepModel.deploy(
+          startBlock,
+          endBlock,
+          blockPerStep,
+          priceStep,
+          startPrice,
+          floorPrice
+        )).to.be.revertedWith("floor price > start price")
+      })
+    })
   })
 
-  describe("#deploy", () => {
-    it("should has correct states", async () => {
-      expect(await descendingStepModel.price()).to.be.eq(0)
+  context("Contract Deployed Correctly", async () => {
+    beforeEach(async () => {
+      ; ({ descendingStepModel } = await waffle.loadFixture(loadFixtureHandler))
+        ;[deployer, alice, bob, dev] = await ethers.getSigners()
+        ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
+          deployer.getAddress(),
+          alice.getAddress(),
+          bob.getAddress(),
+          dev.getAddress(),
+        ])
+
+      priceModelAsAlice = DescendingStepModel__factory.connect(descendingStepModel.address, alice) as DescendingStepModel
+    })
+
+    describe("#deploy", () => {
+      it("should has correct states", async () => {
+        expect(await priceModelAsAlice.price()).to.be.eq(STARTPRICE)
+      })
     })
   })
 })
