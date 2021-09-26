@@ -55,7 +55,7 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     reserveCount = 0;
 
     priceModel = _priceModel;
-    
+
     startingIndex = 0;
   }
 
@@ -78,8 +78,7 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     require(amount <= MAX_ALPACA_PURCHASE, "amount > MAX_ALPACA_PURCHASE");
     require(SafeMath.add(reserveCount, amount) <= maxAlpacas, "sold out");
     
-    // TODO: Need to get price from model
-    uint256 pricePerToken = 0;
+    uint256 pricePerToken = priceModel.price();
     require(SafeMath.mul(pricePerToken, amount) <= msg.value, "insufficent funds");
 
     for (uint256 i = 0; i < amount; i++) {
