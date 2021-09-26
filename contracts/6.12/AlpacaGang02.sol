@@ -44,7 +44,8 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     string memory _symbol,
     uint256 _maxAlpacas,
     uint256 _startBlock,
-    uint256 _revealBlock
+    uint256 _revealBlock,
+    IPriceModel _priceModel
   ) public ERC721(_name, _symbol) {
     startBlock = _startBlock;
     revealBlock = _revealBlock;
@@ -52,6 +53,10 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     maxAlpacas = _maxAlpacas;
 
     reserveCount = 0;
+
+    priceModel = _priceModel;
+    
+    startingIndex = 0;
   }
 
   /// @dev Withdraw funds from minting gang member
@@ -88,7 +93,8 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev Once called, starting index will be finalized
   function reveal() external {
-    require(startingIndex == 0, "Starting index is already set");
+    require(block.number > revealBlock, "it's not time yet");
+    require(startingIndex == 0, "can't reveal again");
     
     startingIndex = uint(blockhash(block.number)) % maxAlpacas;
 
