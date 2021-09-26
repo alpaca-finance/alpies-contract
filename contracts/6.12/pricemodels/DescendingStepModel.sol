@@ -13,17 +13,19 @@ Alpaca Fin Corporation
 
 pragma solidity 0.6.12;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../utils/SafeToken.sol";
 import "../interfaces/IPriceModel.sol";
 
 contract DescendingStepModel is IPriceModel {
+  using SafeMath for uint256;
 
   /// @dev states
   uint256 public startBlock;
   uint256 public endBlock;
   uint256 public blockPerStep;
   uint256 public priceStep;
-  
+
   uint256 public startPrice;
   uint256 public priceFloor;
 
@@ -37,7 +39,7 @@ contract DescendingStepModel is IPriceModel {
   ) public {
     require(_endBlock > _startBlock, "end block < start block");
     require(_startPrice > _priceFloor, "floor price > start price");
-  
+
     startBlock = _startBlock;
     endBlock = _endBlock;
     blockPerStep = _blockPerStep;
@@ -47,15 +49,14 @@ contract DescendingStepModel is IPriceModel {
   }
 
   /// @dev Get current price per token
-  function price() override external view returns (uint256) {
+  function price() external view override returns (uint256) {
     if (block.number <= startBlock) return startPrice;
     // This should prevent overflow
     if (block.number >= endBlock) return priceFloor;
 
-    // TODO: need safe math here?
-    uint256 priceDelta = ((block.number - startBlock) / blockPerStep) * priceStep;
-    
-    uint256 updatedPrice = startPrice - priceDelta;
+    uint256 priceDelta = ((block.number.sub(startBlock)).div(blockPerStep)).mul(priceStep);
+
+    uint256 updatedPrice = startPrice.sub(priceDelta);
 
     if (updatedPrice < priceFloor) return priceFloor;
 
