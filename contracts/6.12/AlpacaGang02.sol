@@ -59,7 +59,7 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     startingIndex = 0;
   }
 
-  /// @dev Withdraw funds from minting gang member
+  /// @dev set the base uri for the collection
   /// @param _baseURI URI that will be used for every token meta data
   function setBaseURI(string memory _baseURI) external onlyOwner {
     _setBaseURI(_baseURI);
