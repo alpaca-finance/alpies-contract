@@ -30,6 +30,10 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
   uint256 public startBlock;
   uint256 public reserveCount;
 
+  uint256 public revealBlock;
+
+  uint256 public startingIndex;
+
   IPriceModel public priceModel;
 
   /// @dev event
@@ -39,12 +43,21 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     string memory _name,
     string memory _symbol,
     uint256 _maxAlpacas,
-    uint256 _startBlock
+    uint256 _startBlock,
+    uint256 _revealBlock
   ) public ERC721(_name, _symbol) {
     startBlock = _startBlock;
+    revealBlock = _revealBlock;
+    
     maxAlpacas = _maxAlpacas;
 
     reserveCount = 0;
+  }
+
+  /// @dev Withdraw funds from minting gang member
+  /// @param _baseURI URI that will be used for every token meta data
+  function setBaseURI(string memory _baseURI) external onlyOwner {
+    _setBaseURI(_baseURI);
   }
 
   /// @dev Withdraw funds from minting gang member
@@ -71,5 +84,17 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     }
 
     reserveCount = SafeMath.add(reserveCount, amount);
+  }
+
+  /// @dev Once called, starting index will be finalized
+  function reveal() external {
+    require(startingIndex == 0, "Starting index is already set");
+    
+    startingIndex = uint(blockhash(block.number)) % maxAlpacas;
+
+    // Prevent default sequence
+    if (startingIndex == 0) {
+        startingIndex = startingIndex.add(1);
+    }
   }
 }
