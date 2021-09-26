@@ -101,7 +101,7 @@ describe("AlpacaGang", () => {
         it("should revert", async () => {
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 21 Alpaca
+          // Mint 21 alpies
           await expect(alpacaGang02.mint(21, { value: ALPACA_PRICE.mul(21), gasPrice: 0 })).to.be.revertedWith("amount > MAX_ALPACA_PURCHASE")
         })
       })
@@ -110,18 +110,26 @@ describe("AlpacaGang", () => {
         it("should revert", async () => {
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 20 Alpaca
+          // Mint 20 alpies
           await alpacaGang02.mint(20, { value: ALPACA_PRICE.mul(20), gasPrice: 0 })
           // Tring to mint another 20 should fail since there's only 10 left
           await expect(alpacaGang02.mint(20, { value: ALPACA_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("sold out")
         })
       })
 
+      describe("insufficient fund", () => {
+        it("should revert", async () => {
+          // Make gasPrice: 0 possible
+          await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+          // Mint 20 alpies but provide only cost of 19 alpies
+          await expect(alpacaGang02.mint(20, { value: ALPACA_PRICE.mul(19), gasPrice: 0 })).to.be.revertedWith("insufficent funds")
+        })
+      })
       describe("params valid", () => {
         it("should be able to mint", async () => {
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 20 Alpaca
+          // Mint 20 alpies
           await alpacaGang02.mint(20, { value: ALPACA_PRICE.mul(20), gasPrice: 0 })
 
           expect(await alpacaGang02.reserveCount()).to.be.eq(20)
