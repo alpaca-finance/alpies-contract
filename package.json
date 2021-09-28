@@ -8,7 +8,7 @@
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
-    "test:alpacagang02": "hardhat test --no-compile ./tests/AlpacaGang02.test.ts",
+    "test:alpies": "hardhat test --no-compile ./tests/Alpies.test.ts",
     "test:descendingmodel": "hardhat test --no-compile ./tests/DescendingStepModel.test.ts",
     "test:fixedpricemodel": "hardhat test --no-compile ./tests/FixedPriceModel.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",

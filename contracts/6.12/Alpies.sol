@@ -21,14 +21,13 @@ import "./utils/SafeToken.sol";
 
 import "./interfaces/IPriceModel.sol";
 
-contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
+contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev constants
-  uint256 public constant MAX_ALPACA_PURCHASE = 20;
-  uint256 public immutable maxAlpacas;
+  uint256 public constant MAX_ALPIES_PURCHASE = 20;
+  uint256 public immutable maxAlpies;
 
   /// @dev states
   uint256 public startBlock;
-  uint256 public reserveCount;
 
   uint256 public revealBlock;
 
@@ -42,21 +41,25 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
   constructor(
     string memory _name,
     string memory _symbol,
-    uint256 _maxAlpacas,
+    uint256 _maxAlpies,
     uint256 _startBlock,
     uint256 _revealBlock,
-    IPriceModel _priceModel
+    IPriceModel _priceModel,
+    uint256 _premintAmount
   ) public ERC721(_name, _symbol) {
     startBlock = _startBlock;
     revealBlock = _revealBlock;
-    
-    maxAlpacas = _maxAlpacas;
 
-    reserveCount = 0;
+    maxAlpies = _maxAlpies;
 
     priceModel = _priceModel;
 
     startingIndex = 0;
+
+    for (uint256 i = 0; i < _premintAmount; i++) {
+      _mint(address(this), i);
+      emit Mint(msg.sender, i);
+    }
   }
 
   /// @dev set the base uri for the collection
@@ -71,34 +74,37 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
     SafeToken.safeTransferETH(_to, address(this).balance);
   }
 
-  /// @dev Mint Alpaca gang member
+  /// @dev Mint Alpies
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant {
     require(block.number > startBlock, "!sale start");
-    require(_amount <= MAX_ALPACA_PURCHASE, "amount > MAX_ALPACA_PURCHASE");
-    require(SafeMath.add(reserveCount, _amount) <= maxAlpacas, "sold out");
-    
+    require(_amount <= MAX_ALPIES_PURCHASE, "amount > MAX_ALPIES_PURCHASE");
+    require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "sold out");
+
     uint256 _pricePerToken = priceModel.price();
+
     require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "insufficent funds");
 
     for (uint256 i = 0; i < _amount; i++) {
-      _mint(address(this), i);
-      emit Mint(msg.sender, i);
+      uint256 mintIndex = totalSupply();
+      // Sanity check
+      if (totalSupply() < maxAlpies) {
+        _safeMint(msg.sender, mintIndex);
+        emit Mint(msg.sender, i);
+      }
     }
-
-    reserveCount = SafeMath.add(reserveCount, _amount);
   }
 
   /// @dev Once called, starting index will be finalized
   function reveal() external {
     require(block.number > revealBlock, "it's not time yet");
     require(startingIndex == 0, "can't reveal again");
-    
-    startingIndex = uint(blockhash(block.number)) % maxAlpacas;
+
+    startingIndex = uint256(blockhash(block.number)) % maxAlpies;
 
     // Prevent default sequence
     if (startingIndex == 0) {
-        startingIndex = startingIndex.add(1);
+      startingIndex = startingIndex.add(1);
     }
   }
 }
