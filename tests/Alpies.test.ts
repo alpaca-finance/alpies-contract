@@ -83,7 +83,7 @@ describe("Alpies", () => {
 
   describe("#deploy", () => {
     it("should has correct states", async () => {
-       expect(await alpies.totalSupply()).to.be.eq(PREMINT_AMOUNT)
+      expect(await alpies.totalSupply()).to.be.eq(PREMINT_AMOUNT)
     })
   })
   describe("#mint", () => {
@@ -141,9 +141,27 @@ describe("Alpies", () => {
   })
 
   describe("#reveal", () => {
-    context("when reveal block hasn't passed", async () => {
-      it("should revert", async () => {
-        await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("it's not time yet")
+    context("when reveal block hasn't passed", () => {
+      context("has not sold out", () => {
+        it("should revert", async () => {
+
+          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("it's not time yet")
+        })
+      })
+      context("sold out", () => {
+        it("should work", async () => {
+          // move block forward to pass startBlock
+          await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+          // Make gasPrice: 0 possible
+          await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+          // Mint 20 alpies
+          await alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })
+          // Mint another 10 to triger sold out
+          await alpies.mint(10, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })
+          await alpacaGangAsAlice.reveal()
+          expect(await alpies.startingIndex()).to.not.be.eq(0)
+          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("can't reveal again")
+        })
       })
     })
 

@@ -95,10 +95,13 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     }
   }
 
-  /// @dev Once called, starting index will be finalized
+  /// @dev Once called, starting index will be finalized. 
   function reveal() external {
-    require(block.number > revealBlock, "it's not time yet");
     require(startingIndex == 0, "can't reveal again");
+    // If sold out before reveal block, can be reveal right away
+    if (totalSupply() < maxAlpies) {
+      require(block.number > revealBlock, "it's not time yet");
+    }
 
     startingIndex = uint256(blockhash(block.number)) % maxAlpies;
 
