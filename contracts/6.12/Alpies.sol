@@ -27,8 +27,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public immutable maxAlpies;
 
   /// @dev states
-  uint256 public startBlock;
-
+  uint256 public saleStartBlock;
+  uint256 public saleEndBlock;
   uint256 public revealBlock;
 
   uint256 public startingIndex;
@@ -42,12 +42,14 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     string memory _name,
     string memory _symbol,
     uint256 _maxAlpies,
-    uint256 _startBlock,
+    uint256 _saleStartBlock,
+    uint256 _saleEndBlock,
     uint256 _revealBlock,
     IPriceModel _priceModel,
     uint256 _premintAmount
   ) public ERC721(_name, _symbol) {
-    startBlock = _startBlock;
+    saleStartBlock = _saleStartBlock;
+    saleEndBlock = _saleEndBlock;
     revealBlock = _revealBlock;
 
     maxAlpies = _maxAlpies;
@@ -77,13 +79,13 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev Mint Alpies
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant {
-    require(block.number > startBlock, "!sale start");
-    require(_amount <= MAX_ALPIES_PURCHASE, "amount > MAX_ALPIES_PURCHASE");
-    require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "sold out");
+    require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::Not in sale period");
+    require(_amount <= MAX_ALPIES_PURCHASE, "Alpies::amount > MAX_ALPIES_PURCHASE");
+    require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "Alpies::sold out");
 
     uint256 _pricePerToken = priceModel.price();
 
-    require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "insufficent funds");
+    require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "Alpies::insufficent funds");
 
     for (uint256 i = 0; i < _amount; i++) {
       uint256 mintIndex = totalSupply();
@@ -95,12 +97,12 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     }
   }
 
-  /// @dev Once called, starting index will be finalized. 
+  /// @dev Once called, starting index will be finalized.
   function reveal() external {
-    require(startingIndex == 0, "can't reveal again");
+    require(startingIndex == 0, "Alpies::can't reveal again");
     // If sold out before reveal block, can be reveal right away
     if (totalSupply() < maxAlpies) {
-      require(block.number > revealBlock, "it's not time yet");
+      require(block.number > revealBlock, "Alpies::it's not time yet");
     }
 
     // Get the blockhash of the last block

@@ -38,6 +38,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     "ALPIES",
     MAX_ALPIES,
     (await latestBlockNumber()).add(1000),
+    (await latestBlockNumber()).add(1800),
     (await latestBlockNumber()).add(2000),
     fixedPriceModel.address,
     PREMINT_AMOUNT
@@ -89,7 +90,7 @@ describe("Alpies", () => {
   describe("#mint", () => {
     context("when startBlock hasn't passed", async () => {
       it("should revert", async () => {
-        await expect(alpies.mint(1)).to.be.revertedWith("!sale start")
+        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::Not in sale period")
       })
     })
 
@@ -104,7 +105,7 @@ describe("Alpies", () => {
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
           // Mint 21 alpies
-          await expect(alpies.mint(21, { value: ALPIES_PRICE.mul(21), gasPrice: 0 })).to.be.revertedWith("amount > MAX_ALPIES_PURCHASE")
+          await expect(alpies.mint(21, { value: ALPIES_PRICE.mul(21), gasPrice: 0 })).to.be.revertedWith("Alpies::amount > MAX_ALPIES_PURCHASE")
         })
       })
 
@@ -115,7 +116,7 @@ describe("Alpies", () => {
           // Mint 20 alpies
           await alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })
           // Tring to mint another 20 should fail since there's only 10 left
-          await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("sold out")
+          await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("Alpies::sold out")
         })
       })
 
@@ -124,7 +125,17 @@ describe("Alpies", () => {
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
           // Mint 20 alpies but provide only cost of 19 alpies
-          await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(19), gasPrice: 0 })).to.be.revertedWith("insufficent funds")
+          await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(19), gasPrice: 0 })).to.be.revertedWith("Alpies::insufficent funds")
+        })
+      })
+
+      describe("sale ended", () => {
+        it("should revert", async () => {
+          await advanceBlockTo((await latestBlockNumber()).add(2000).toNumber())
+          // Make gasPrice: 0 possible
+          await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+          // Mint 20 alpies but provide only cost of 19 alpies
+          await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("Alpies::Not in sale period")
         })
       })
       describe("params valid", () => {
@@ -145,7 +156,7 @@ describe("Alpies", () => {
       context("has not sold out", () => {
         it("should revert", async () => {
 
-          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("it's not time yet")
+          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("Alpies::it's not time yet")
         })
       })
       context("sold out", () => {
@@ -160,7 +171,7 @@ describe("Alpies", () => {
           await alpies.mint(10, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })
           await alpacaGangAsAlice.reveal()
           expect(await alpies.startingIndex()).to.not.be.eq(0)
-          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("can't reveal again")
+          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("Alpies::can't reveal again")
         })
       })
     })
@@ -173,7 +184,7 @@ describe("Alpies", () => {
       describe("has been revealed already", async () => {
         it("should revert", async () => {
           await alpacaGangAsAlice.reveal()
-          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("can't reveal again")
+          await expect(alpacaGangAsAlice.reveal()).to.be.revertedWith("Alpies::can't reveal again")
         })
       })
 
