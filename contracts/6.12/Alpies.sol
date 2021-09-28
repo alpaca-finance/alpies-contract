@@ -103,7 +103,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
       require(block.number > revealBlock, "it's not time yet");
     }
 
-    startingIndex = uint256(blockhash(block.number)) % maxAlpies;
+    // Get the blockhash of the last block
+    startingIndex = uint256(blockhash(block.number - 1)) % maxAlpies;
 
     // Prevent default sequence
     if (startingIndex == 0) {
