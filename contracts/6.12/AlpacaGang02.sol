@@ -66,28 +66,27 @@ contract AlpacaGang02 is ERC721, Ownable, ReentrancyGuard {
   }
 
   /// @dev Withdraw funds from minting gang member
-  /// @param to The address to received funds
-  function withdraw(address to) external onlyOwner {
-    SafeToken.safeTransferETH(to, address(this).balance);
+  /// @param _to The address to received funds
+  function withdraw(address _to) external onlyOwner {
+    SafeToken.safeTransferETH(_to, address(this).balance);
   }
 
   /// @dev Mint Alpaca gang member
-  /// @param amount The amount of tokens that users wish to buy
-  function mint(uint256 amount) external payable nonReentrant {
+  /// @param _amount The amount of tokens that users wish to buy
+  function mint(uint256 _amount) external payable nonReentrant {
     require(block.number > startBlock, "!sale start");
-    require(amount <= MAX_ALPACA_PURCHASE, "amount > MAX_ALPACA_PURCHASE");
-    require(SafeMath.add(reserveCount, amount) <= maxAlpacas, "sold out");
+    require(_amount <= MAX_ALPACA_PURCHASE, "amount > MAX_ALPACA_PURCHASE");
+    require(SafeMath.add(reserveCount, _amount) <= maxAlpacas, "sold out");
     
-    uint256 pricePerToken = priceModel.price();
-    require(SafeMath.mul(pricePerToken, amount) <= msg.value, "insufficent funds");
+    uint256 _pricePerToken = priceModel.price();
+    require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "insufficent funds");
 
-    for (uint256 i = 0; i < amount; i++) {
-      // TODO: mint logic here
+    for (uint256 i = 0; i < _amount; i++) {
       _mint(address(this), i);
       emit Mint(msg.sender, i);
     }
 
-    reserveCount = SafeMath.add(reserveCount, amount);
+    reserveCount = SafeMath.add(reserveCount, _amount);
   }
 
   /// @dev Once called, starting index will be finalized
