@@ -3,7 +3,7 @@ import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import { smockit, MockContract } from "@eth-optimism/smock"
-import { Alpies, Alpies__factory, DescendingStepModel__factory, FixedPriceModel, FixedPriceModel__factory } from "../typechain"
+import { Alpies, Alpies__factory, FixedPriceModel, FixedPriceModel__factory } from "../typechain"
 import { advanceBlockTo, latestBlockNumber } from "./helpers/time"
 
 chai.use(solidity)

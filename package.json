@@ -10,6 +10,7 @@
     "test": "hardhat test --no-compile",
     "test:alpies": "hardhat test --no-compile ./tests/Alpies.test.ts",
     "test:descendingmodel": "hardhat test --no-compile ./tests/DescendingStepModel.test.ts",
+    "test:ascendingmodel": "hardhat test --no-compile ./tests/AscendingStepModel.test.ts",
     "test:fixedpricemodel": "hardhat test --no-compile ./tests/FixedPriceModel.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
     "coverage": "hardhat coverage",
