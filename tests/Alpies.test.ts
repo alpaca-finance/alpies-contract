@@ -17,6 +17,7 @@ type fixture = {
 const MAX_ALPIES = 35
 const PREMINT_AMOUNT = 5
 const ALPIES_PRICE = ethers.utils.parseEther("1")
+const provenanceHash = "RANDOM_HASH"
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
@@ -95,8 +96,19 @@ describe("Alpies", () => {
       })
     })
 
+    context("when the provenanceHash is not set", async () => {
+      it("should revert", async () => {
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+        // try to mint for NFT
+        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::setProvenanceHash:: provenanceHash not set")
+      })
+    })
+
     context("when startBlock is passed", async () => {
       beforeEach(async () => {
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
       })
@@ -153,6 +165,7 @@ describe("Alpies", () => {
   })
 
   describe("#reveal", () => {
+    
     context("when reveal block hasn't passed", () => {
       context("has not sold out", () => {
         it("should revert", async () => {
@@ -162,7 +175,8 @@ describe("Alpies", () => {
       })
       context("sold out", () => {
         it("should work", async () => {
-          
+          // setProvenanceHash
+          await alpies.setProvenanceHash(provenanceHash)
           // move block forward to pass startBlock
           await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
           // Make gasPrice: 0 possible
@@ -224,6 +238,8 @@ describe("Alpies", () => {
 
     context("when owner call withdraw", () => {
       it("should work", async () => {
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // mint alpies
@@ -237,6 +253,29 @@ describe("Alpies", () => {
         const balanceAfter = await deployer.getBalance()
 
         expect(balanceAfter.sub(balanceBefore)).to.eq(ALPIES_PRICE.mul(20))
+      })
+    })
+  })
+
+  describe("#setProvenanceHash", () => {
+    context("when owner call setProvenanceHash", () => {
+      it("should work", async () => {
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
+        // get provenanceHash from contract
+        const contractProvenanceHash = await alpies.provenanceHash()
+        expect(contractProvenanceHash).to.eq(provenanceHash)
+      })
+    })
+
+    context("when owner try to call setProvenanceHash more than once", () => {
+      it("should revert", async () => {
+        // setProvenanceHash first time
+        await alpies.setProvenanceHash(provenanceHash)
+        // setProvenanceHash again
+        await expect(alpies.setProvenanceHash("newHash")).to.revertedWith("Alpies::setProvenanceHash:: provenanceHash already set")
+        // setProvenanceHash empty string again
+        await expect(alpies.setProvenanceHash("")).to.revertedWith("Alpies::setProvenanceHash:: provenanceHash already set")
       })
     })
   })

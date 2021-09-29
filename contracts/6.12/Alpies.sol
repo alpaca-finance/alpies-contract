@@ -32,6 +32,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public revealBlock;
 
   uint256 public startingIndex;
+  string public provenanceHash;
 
   IPriceModel public priceModel;
 
@@ -74,6 +75,13 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     emit SetBaseURI(msg.sender, _baseURI);
   }
 
+  /// @dev set the provenanceHash
+  /// @param _provenancaHash SHA256 Digest of concatenated SHA256 of the sequence of images
+  function setProvenanceHash(string memory _provenancaHash) external onlyOwner {
+    require(keccak256(bytes(provenanceHash)) == keccak256(bytes("")), "Alpies::setProvenanceHash:: provenanceHash already set");
+    provenanceHash = _provenancaHash;
+  }
+
   /// @dev Withdraw funds from minting gang member
   /// @param _to The address to received funds
   function withdraw(address _to) external onlyOwner {
@@ -86,6 +94,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
     require(_amount <= MAX_ALPIES_PURCHASE, "Alpies::mint:: amount > MAX_ALPIES_PURCHASE");
     require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "Alpies::mint:: sold out");
+    require(keccak256(bytes(provenanceHash)) != keccak256(bytes("")), "Alpies::setProvenanceHash:: provenanceHash not set");
 
     uint256 _pricePerToken = priceModel.price();
 
