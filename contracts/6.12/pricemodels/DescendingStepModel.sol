@@ -37,8 +37,8 @@ contract DescendingStepModel is IPriceModel {
     uint256 _startPrice,
     uint256 _priceFloor
   ) public {
-    require(_endBlock > _startBlock, "end block < start block");
-    require(_startPrice > _priceFloor, "floor price > start price");
+    require(_endBlock > _startBlock, "DescendingStepModel::constructor:: end block < start block");
+    require(_startPrice > _priceFloor, "DescendingStepModel::constructor:: floor price > start price");
 
     startBlock = _startBlock;
     endBlock = _endBlock;

@@ -82,7 +82,7 @@ describe("Desending Price Model", () => {
           priceStep,
           startPrice,
           floorPrice
-        )).to.be.revertedWith("end block < start block")
+        )).to.be.revertedWith("DescendingStepModel::constructor:: end block < start block")
       })
     })
 
@@ -107,7 +107,7 @@ describe("Desending Price Model", () => {
           priceStep,
           startPrice,
           floorPrice
-        )).to.be.revertedWith("end block < start block")
+        )).to.be.revertedWith("DescendingStepModel::constructor:: end block < start block")
       })
     })
 
@@ -132,7 +132,7 @@ describe("Desending Price Model", () => {
           priceStep,
           startPrice,
           floorPrice
-        )).to.be.revertedWith("floor price > start price")
+        )).to.be.revertedWith("DescendingStepModel::constructor:: floor price > start price")
       })
     })
   })

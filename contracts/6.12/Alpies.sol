@@ -37,6 +37,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev event
   event Mint(address indexed caller, uint256 indexed tokenId);
+  event SetBaseURI(address indexed caller, string baseURI);
+  event Reveal(address indexed caller, uint256 indexed startingIndex);
 
   constructor(
     string memory _name,
@@ -56,8 +58,6 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     priceModel = _priceModel;
 
-    startingIndex = 0;
-
     for (uint256 i = 0; i < _premintAmount; i++) {
       _safeMint(msg.sender, i);
       emit Mint(msg.sender, i);
@@ -68,6 +68,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _baseURI URI that will be used for every token meta data
   function setBaseURI(string memory _baseURI) external onlyOwner {
     _setBaseURI(_baseURI);
+    emit SetBaseURI(msg.sender, _baseURI);
   }
 
   /// @dev Withdraw funds from minting gang member
@@ -79,13 +80,13 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev Mint Alpies
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant {
-    require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::Not in sale period");
-    require(_amount <= MAX_ALPIES_PURCHASE, "Alpies::amount > MAX_ALPIES_PURCHASE");
-    require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "Alpies::sold out");
+    require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
+    require(_amount <= MAX_ALPIES_PURCHASE, "Alpies::mint:: amount > MAX_ALPIES_PURCHASE");
+    require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "Alpies::mint:: sold out");
 
     uint256 _pricePerToken = priceModel.price();
 
-    require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "Alpies::insufficent funds");
+    require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "Alpies::mint:: insufficent funds");
 
     for (uint256 i = 0; i < _amount; i++) {
       uint256 mintIndex = totalSupply();
@@ -99,10 +100,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev Once called, starting index will be finalized.
   function reveal() external {
-    require(startingIndex == 0, "Alpies::can't reveal again");
+    require(startingIndex == 0, "Alpies::reveal:: can't reveal again");
     // If sold out before reveal block, can be revealed right away
     if (totalSupply() < maxAlpies) {
-      require(block.number > revealBlock, "Alpies::it's not time yet");
+      require(block.number > revealBlock, "Alpies::reveal:: it's not time yet");
     }
 
     // Get the blockhash of the last block
@@ -112,5 +113,6 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     if (startingIndex == 0) {
       startingIndex = startingIndex.add(1);
     }
+    emit Reveal(msg.sender, startingIndex);
   }
 }
