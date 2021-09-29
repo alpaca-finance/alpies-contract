@@ -22,7 +22,7 @@ contract DescendingStepModel is IPriceModel {
 
   /// @dev states
   uint256 public startBlock;
-  uint256 public endBlock;
+  uint256 public override endBlock;
   uint256 public blockPerStep;
   uint256 public priceStep;
 

@@ -50,6 +50,9 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     IPriceModel _priceModel,
     uint256 _premintAmount
   ) public ERC721(_name, _symbol) {
+    require(_priceModel.endBlock() < _saleEndBlock, "Alpies::constructor:: priceModel endblock > saleEndBlock");
+    require(_revealBlock > _saleEndBlock, "Alpies::constructor:: revealBlock < saleEndBlock");
+
     saleStartBlock = _saleStartBlock;
     saleEndBlock = _saleEndBlock;
     revealBlock = _revealBlock;
