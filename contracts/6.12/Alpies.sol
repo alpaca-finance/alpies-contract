@@ -102,11 +102,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     for (uint256 i = 0; i < _amount; i++) {
       uint256 mintIndex = totalSupply();
-      // Sanity check
-      if (totalSupply() < maxAlpies) {
-        _safeMint(msg.sender, mintIndex);
-        emit Mint(msg.sender, mintIndex);
-      }
+      _safeMint(msg.sender, mintIndex);
+      emit Mint(msg.sender, mintIndex);
     }
   }
 
