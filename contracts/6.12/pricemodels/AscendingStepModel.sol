@@ -58,7 +58,7 @@ contract AscendingStepModel is IPriceModel {
 
     uint256 _updatedPrice = startPrice.add(_priceDelta);
 
-    if (_updatedPrice > priceCeiling) return priceCeiling;
+    if (_updatedPrice >= priceCeiling) return priceCeiling;
 
     return _updatedPrice;
   }
