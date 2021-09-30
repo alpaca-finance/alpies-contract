@@ -27,7 +27,9 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   const FixedPriceModel = (await ethers.getContractFactory("FixedPriceModel", deployer)) as FixedPriceModel__factory
   const fixedPriceModel = await FixedPriceModel.deploy(
-    ALPIES_PRICE
+    (await latestBlockNumber()).add(1000),
+    (await latestBlockNumber()).add(1800),
+    ALPIES_PRICE,
   )
   await fixedPriceModel.deployed()
 
@@ -38,8 +40,6 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     "Alpies",
     "ALPIES",
     MAX_ALPIES,
-    (await latestBlockNumber()).add(1000),
-    (await latestBlockNumber()).add(1800),
     (await latestBlockNumber()).add(2000),
     fixedPriceModel.address,
     PREMINT_AMOUNT

@@ -21,7 +21,7 @@ contract AscendingStepModel is IPriceModel {
   using SafeMath for uint256;
 
   /// @dev states
-  uint256 public startBlock;
+  uint256 public override startBlock;
   uint256 public override endBlock;
   uint256 public blockPerStep;
   uint256 public priceStep;

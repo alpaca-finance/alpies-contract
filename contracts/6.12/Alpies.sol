@@ -30,12 +30,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public constant MAX_ALPIES_PURCHASE = 20;
   uint256 public immutable maxAlpies;
   uint256 public immutable premintAmount;
+  uint256 public immutable saleStartBlock;
+  uint256 public immutable saleEndBlock;
+  uint256 public immutable revealBlock;
 
   /// @dev states
-  uint256 public saleStartBlock;
-  uint256 public saleEndBlock;
-  uint256 public revealBlock;
-
   uint256 public startingIndex;
   string public provenanceHash;
 
@@ -50,17 +49,14 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     string memory _name,
     string memory _symbol,
     uint256 _maxAlpies,
-    uint256 _saleStartBlock,
-    uint256 _saleEndBlock,
     uint256 _revealBlock,
     IPriceModel _priceModel,
     uint256 _premintAmount
   ) public ERC721(_name, _symbol) {
-    require(_priceModel.endBlock() < _saleEndBlock, "Alpies::constructor:: priceModel endblock > saleEndBlock");
-    require(_revealBlock > _saleEndBlock, "Alpies::constructor:: revealBlock < saleEndBlock");
+    require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
 
-    saleStartBlock = _saleStartBlock;
-    saleEndBlock = _saleEndBlock;
+    saleStartBlock = _priceModel.startBlock();
+    saleEndBlock = _priceModel.endBlock();
     revealBlock = _revealBlock;
 
     maxAlpies = _maxAlpies;
