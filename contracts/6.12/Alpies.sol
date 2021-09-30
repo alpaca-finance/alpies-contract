@@ -66,7 +66,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     priceModel = _priceModel;
 
     for (uint256 i = 0; i < _premintAmount; i++) {
-      _safeMint(msg.sender, i);
+      _mint(msg.sender, i);
       emit Mint(msg.sender, i);
     }
   }
@@ -111,7 +111,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     for (uint256 i = 0; i < _amount; i++) {
       uint256 mintIndex = totalSupply();
-      _safeMint(msg.sender, mintIndex);
+      _mint(msg.sender, mintIndex);
       emit Mint(msg.sender, mintIndex);
     }
   }
