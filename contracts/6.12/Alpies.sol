@@ -16,15 +16,20 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 import "./utils/SafeToken.sol";
 
 import "./interfaces/IPriceModel.sol";
 
 contract Alpies is ERC721, Ownable, ReentrancyGuard {
+  /// @notice Libraries
+  using SafeMath for uint256;
+
   /// @dev constants
   uint256 public constant MAX_ALPIES_PURCHASE = 20;
   uint256 public immutable maxAlpies;
+  uint256 public immutable premintAmount;
 
   /// @dev states
   uint256 public saleStartBlock;
@@ -59,6 +64,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     revealBlock = _revealBlock;
 
     maxAlpies = _maxAlpies;
+    premintAmount = _premintAmount;
 
     priceModel = _priceModel;
 
@@ -66,6 +72,12 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
       _safeMint(msg.sender, i);
       emit Mint(msg.sender, i);
     }
+  }
+
+  /// @dev Require that the caller must be an EOA account to avoid flash loans.
+  modifier onlyEOA() {
+    require(msg.sender == tx.origin, "Alpies::onlyEOA:: not eoa");
+    _;
   }
 
   /// @dev set the base uri for the collection
@@ -78,7 +90,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev set the provenanceHash
   /// @param _provenancaHash SHA256 Digest of concatenated SHA256 of the sequence of images
   function setProvenanceHash(string memory _provenancaHash) external onlyOwner {
-    require(keccak256(bytes(provenanceHash)) == keccak256(bytes("")), "Alpies::setProvenanceHash:: provenanceHash already set");
+    require(bytes(provenanceHash).length == 0, "Alpies::setProvenanceHash:: provenanceHash already set");
     provenanceHash = _provenancaHash;
   }
 
@@ -90,15 +102,15 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev Mint Alpies
   /// @param _amount The amount of tokens that users wish to buy
-  function mint(uint256 _amount) external payable nonReentrant {
+  function mint(uint256 _amount) external payable nonReentrant onlyEOA {
     require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
     require(_amount <= MAX_ALPIES_PURCHASE, "Alpies::mint:: amount > MAX_ALPIES_PURCHASE");
-    require(SafeMath.add(totalSupply(), _amount) <= maxAlpies, "Alpies::mint:: sold out");
-    require(keccak256(bytes(provenanceHash)) != keccak256(bytes("")), "Alpies::setProvenanceHash:: provenanceHash not set");
+    require(totalSupply().add(_amount) <= maxAlpies, "Alpies::mint:: sold out");
+    require(bytes(provenanceHash).length != 0, "Alpies::setProvenanceHash:: provenanceHash not set");
 
     uint256 _pricePerToken = priceModel.price();
 
-    require(SafeMath.mul(_pricePerToken, _amount) <= msg.value, "Alpies::mint:: insufficent funds");
+    require(_pricePerToken.mul(_amount) <= msg.value, "Alpies::mint:: insufficent funds");
 
     for (uint256 i = 0; i < _amount; i++) {
       uint256 mintIndex = totalSupply();
@@ -123,5 +135,16 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
       startingIndex = startingIndex.add(1);
     }
     emit Reveal(msg.sender, startingIndex);
+  }
+
+   /// @dev get alpiesId from mintIndex
+   /// @param _mintIndex The index that alpie is minted
+  function alpiesId(uint256 _mintIndex) external view returns (uint256) {
+    require(startingIndex != 0, "Alpies::alpiesId:: alpies not reveal yet");
+    // if alpies in premint set
+    if(_mintIndex < premintAmount) return _mintIndex;
+    // ( (_mintIndex + startingIndex - premintAmount) % (maxAlpies - premintAmount) ) + premintAmount
+    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(premintAmount)).mod(maxAlpies.sub(premintAmount))).add(premintAmount);
+    return _alpiesId;
   }
 }

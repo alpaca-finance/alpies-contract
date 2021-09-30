@@ -2,7 +2,7 @@ import { ethers, waffle, network } from "hardhat"
 import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
-import { Alpies, Alpies__factory, FixedPriceModel, FixedPriceModel__factory } from "../typechain"
+import { Alpies, Alpies__factory, FixedPriceModel, FixedPriceModel__factory, MockContractContext, MockContractContext__factory } from "../typechain"
 import { advanceBlockTo, latestBlockNumber } from "./helpers/time"
 
 chai.use(solidity)
@@ -12,6 +12,7 @@ const { parseEther, formatBytes32String } = ethers.utils
 
 type fixture = {
   alpies: Alpies
+  evilContract: MockContractContext
 }
 
 const MAX_ALPIES = 35
@@ -45,7 +46,15 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   )
   await alpies.deployed()
 
-  return { alpies }
+  // Setup MockContractContext
+  const MockContractContext = (await ethers.getContractFactory(
+    "MockContractContext",
+    deployer
+  )) as MockContractContext__factory;
+  const evilContract = await MockContractContext.deploy();
+  await evilContract.deployed();
+
+  return { alpies, evilContract}
 }
 
 describe("Alpies", () => {
@@ -63,6 +72,7 @@ describe("Alpies", () => {
 
   // Contracts
   let alpies: Alpies
+  let evilContract: MockContractContext;
 
   // Signer
   let alpiesAsDeployer: Alpies
@@ -70,7 +80,7 @@ describe("Alpies", () => {
   let alpiesAsBob: Alpies
 
   beforeEach(async () => {
-    ; ({ alpies } = await waffle.loadFixture(loadFixtureHandler))
+    ; ({ alpies, evilContract } = await waffle.loadFixture(loadFixtureHandler))
       ;[deployer, alice, bob, dev] = await ethers.getSigners()
       ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
         deployer.getAddress(),
@@ -151,6 +161,20 @@ describe("Alpies", () => {
           await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("Alpies::mint:: not in sale period")
         })
       })
+      
+      describe("evilContract try to mint", () => {
+        it("should revert", async () => {
+          await expect(
+            evilContract.executeTransaction(
+              alpies.address,
+              0,
+              "mint(uint256)",
+              ethers.utils.defaultAbiCoder.encode(["uint256"], ["0"])
+            )
+          ).to.be.revertedWith("Alpies::onlyEOA:: not eoa");
+        })
+      })
+      
       describe("params valid", () => {
         it("should be able to mint", async () => {
           // Make gasPrice: 0 possible
@@ -276,6 +300,40 @@ describe("Alpies", () => {
         await expect(alpies.setProvenanceHash("newHash")).to.revertedWith("Alpies::setProvenanceHash:: provenanceHash already set")
         // setProvenanceHash empty string again
         await expect(alpies.setProvenanceHash("")).to.revertedWith("Alpies::setProvenanceHash:: provenanceHash already set")
+      })
+    })
+  })
+
+  describe("#alpiesId", () => {
+    beforeEach(async () => {
+      // setProvenanceHash
+      await alpies.setProvenanceHash(provenanceHash)
+      // move block forward to pass startBlock
+      await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+    })
+    context("when try to get alpiesId before reveal", () => {
+      it("should revert", async () => {
+        await expect(alpies.alpiesId(0)).to.revertedWith("Alpies::alpiesId:: alpies not reveal yet")
+      })
+    })
+    context("when try to get alpiesId after reveal", () => {
+      it("should work", async () => {
+        // move block forward to pass revealBlock
+        await advanceBlockTo((await latestBlockNumber()).add(2000).toNumber())
+        // reveal alpies
+        await alpiesAsAlice.reveal()
+        const startingIndex = await alpiesAsAlice.startingIndex()
+        // mintIndex in premint set
+        let mintIndex = PREMINT_AMOUNT - 1
+        let alpiesId = await alpies.alpiesId(mintIndex)
+        expect(alpiesId).to.eq(mintIndex)
+    
+        // mintIndex not in premint set
+        mintIndex = PREMINT_AMOUNT
+        alpiesId = await alpies.alpiesId(PREMINT_AMOUNT)
+        // ( (_mintIndex + startingIndex - premintAmount) % (maxAlpies - premintAmount) ) + premintAmount
+        const expectAlpiesId = (BigNumber.from(mintIndex).add(startingIndex).sub(PREMINT_AMOUNT).mod(BigNumber.from(MAX_ALPIES).sub(PREMINT_AMOUNT))).add(PREMINT_AMOUNT)
+        expect(alpiesId).to.eq(expectAlpiesId)
       })
     })
   })
