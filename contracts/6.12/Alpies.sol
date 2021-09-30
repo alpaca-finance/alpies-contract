@@ -54,6 +54,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _premintAmount
   ) public ERC721(_name, _symbol) {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
+    require(_maxAlpies > _premintAmount, "Alpies::constructor:: _maxAlpies < _premintAmount");
 
     saleStartBlock = _priceModel.startBlock();
     saleEndBlock = _priceModel.endBlock();

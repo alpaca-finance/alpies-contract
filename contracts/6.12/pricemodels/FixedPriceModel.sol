@@ -18,7 +18,7 @@ import "../interfaces/IPriceModel.sol";
 
 contract FixedPriceModel is IPriceModel {
   /// @dev states
-  uint256 public fixPrice;
+  uint256 public immutable fixPrice;
   uint256 public override startBlock;
   uint256 public override endBlock;
 
