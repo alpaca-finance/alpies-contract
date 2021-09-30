@@ -22,6 +22,8 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   const FixedPriceModel = (await ethers.getContractFactory("FixedPriceModel", deployer)) as FixedPriceModel__factory
   const fixedPriceModel = await FixedPriceModel.deploy(
+    (await latestBlockNumber()).add(1000),
+    (await latestBlockNumber()).add(1800),
     PRICE
   )
   await fixedPriceModel.deployed()
