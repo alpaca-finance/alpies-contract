@@ -17,6 +17,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/Math.sol";
 
 import "./utils/SafeToken.sol";
 
@@ -27,18 +28,36 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
 
   /// @dev constants
-  uint256 public constant MAX_ALPIES_PURCHASE = 20;
   uint256 public immutable maxAlpies;
   uint256 public immutable premintAmount;
   uint256 public immutable saleStartBlock;
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
 
+  uint256 public maxPurchasePerWindow;
+  uint256 public purchaseWindowSize;
+
+  uint256 public maxAlpiePerAddress;
+
   /// @dev states
   uint256 public startingIndex;
   string public provenanceHash;
 
   IPriceModel public priceModel;
+
+  // TODO: 1. Max alpie per address: checked
+  // 2. Cooldown : checked
+  // 3. Refund : check
+
+  mapping(address => uint256) public alpieUserPurchased;
+
+  struct PurchaseHistory {
+    uint256 counter;
+    uint256 windowStartBlock;
+  }
+
+  mapping(address => PurchaseHistory) public userPurchaseHistory;
+
 
   /// @dev event
   event Mint(address indexed caller, uint256 indexed tokenId);
@@ -60,9 +79,15 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     saleEndBlock = _priceModel.endBlock();
     revealBlock = _revealBlock;
 
+    // set immutatble variable
+
+    maxPurchasePerWindow = 30;
+    purchaseWindowSize = 100;
+    maxAlpiePerAddress = 90;
+
     maxAlpies = _maxAlpies;
     premintAmount = _premintAmount;
-
+  
     priceModel = _priceModel;
 
     for (uint256 i = 0; i < _premintAmount; i++) {
@@ -101,19 +126,82 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant onlyEOA {
     require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
-    require(_amount <= MAX_ALPIES_PURCHASE, "Alpies::mint:: amount > MAX_ALPIES_PURCHASE");
-    require(totalSupply().add(_amount) <= maxAlpies, "Alpies::mint:: sold out");
     require(bytes(provenanceHash).length != 0, "Alpies::setProvenanceHash:: provenanceHash not set");
 
+    // 1. Find max purchaseable. Minumum of the following
+    // 1.1 Per window
+    // 1.2 Per address 
+    // 1.3 maxAlpies - totalSupply
+    // 1.4 _amount
+
+    uint256 _maxPurchaseable = Math.min(maxinmumPurchaseable(msg.sender), _amount);
+
+    // 2. Calcuate total price for check out
     uint256 _pricePerToken = priceModel.price();
 
-    require(_pricePerToken.mul(_amount) <= msg.value, "Alpies::mint:: insufficent funds");
+    uint256 _checkoutCost = _pricePerToken.mul(_maxPurchaseable);
 
-    for (uint256 i = 0; i < _amount; i++) {
+    require(_maxPurchaseable > 0, "Alpies::unpurchasable");
+    require(_pricePerToken.mul(_maxPurchaseable) <= msg.value, "Alpies::mint:: insufficent funds");
+
+
+    // 3. Mint NFT per _maxPurchaseable and keep track of total price
+    for (uint256 i = 0; i < _maxPurchaseable; i++) {
       uint256 mintIndex = totalSupply();
       _mint(msg.sender, mintIndex);
       emit Mint(msg.sender, mintIndex);
     }
+
+    // 4. Update user's stat
+    // 4.1 update purchase per window per user
+    // 4.2 update purchase per address
+
+    _updatePurchasePerUser(msg.sender, _maxPurchaseable);
+    _updateUserPurchaseWindow(msg.sender, _maxPurchaseable);
+
+    // 5. Refund unused fund
+    // 5.1 emit event?
+    uint256 changes = msg.value.sub(_checkoutCost);
+    SafeToken.safeTransferETH(msg.sender, changes);
+  }
+
+  function maxinmumPurchaseable(address _buyer) public view returns (uint256) {
+    // 1. Find max purchaseable. Minumum of the following
+    // 1.1 Per window
+    // 1.2 Per address 
+    // 1.3 maxAlpies - totalSupply
+    uint256 _supplyLeft = maxAlpies.sub(totalSupply());
+    uint256 _maxPurchaseable = Math.min(_maxUserPurchaseInWindow(_buyer), _maxPurchaseblePerAddress(_buyer));
+
+    return Math.min(_maxPurchaseable, _supplyLeft);
+  }
+
+  function _updatePurchasePerUser(address _buyer, uint256 _amount) internal {
+    alpieUserPurchased[_buyer] = alpieUserPurchased[_buyer].add(_amount);
+  }
+
+  function _updateUserPurchaseWindow(address _buyer, uint256 _amount) internal  {
+    PurchaseHistory storage _userPurchaseHistory = userPurchaseHistory[_buyer];
+    
+    _userPurchaseHistory.counter = _userPurchaseHistory.counter.add(_amount);
+
+    if (
+      uint256(block.number).sub(_userPurchaseHistory.windowStartBlock) > purchaseWindowSize || 
+      _userPurchaseHistory.windowStartBlock == 0
+    ) {
+      _userPurchaseHistory.counter = _amount;
+      _userPurchaseHistory.windowStartBlock = block.number;
+    }
+  }
+
+  function _maxUserPurchaseInWindow(address _buyer) internal view returns (uint256) {
+    uint256 _purchasedInThisWindow = userPurchaseHistory[_buyer].counter;
+    return maxPurchasePerWindow.sub(_purchasedInThisWindow);
+  }
+
+  function _maxPurchaseblePerAddress(address _buyer) internal view returns (uint256) {
+    uint256 _purchased = alpieUserPurchased[_buyer];
+    return maxAlpiePerAddress.sub(_purchased);
   }
 
   /// @dev Once called, starting index will be finalized.
@@ -134,14 +222,16 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     emit Reveal(msg.sender, startingIndex);
   }
 
-   /// @dev get alpiesId from mintIndex
-   /// @param _mintIndex The index that alpie is minted
+  /// @dev get alpiesId from mintIndex
+  /// @param _mintIndex The index that alpie is minted
   function alpiesId(uint256 _mintIndex) external view returns (uint256) {
     require(startingIndex != 0, "Alpies::alpiesId:: alpies not reveal yet");
     // if alpies in premint set
-    if(_mintIndex < premintAmount) return _mintIndex;
+    if (_mintIndex < premintAmount) return _mintIndex;
     // ( (_mintIndex + startingIndex - premintAmount) % (maxAlpies - premintAmount) ) + premintAmount
-    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(premintAmount)).mod(maxAlpies.sub(premintAmount))).add(premintAmount);
+    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(premintAmount)).mod(maxAlpies.sub(premintAmount))).add(
+      premintAmount
+    );
     return _alpiesId;
   }
 }
