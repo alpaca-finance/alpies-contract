@@ -34,20 +34,16 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
 
-  uint256 public maxPurchasePerWindow;
-  uint256 public purchaseWindowSize;
+  uint256 public immutable maxPurchasePerWindow;
+  uint256 public immutable purchaseWindowSize;
 
-  uint256 public maxAlpiePerAddress;
+  uint256 public immutable maxAlpiePerAddress;
 
   /// @dev states
   uint256 public startingIndex;
   string public provenanceHash;
 
   IPriceModel public priceModel;
-
-  // TODO: 1. Max alpie per address: checked
-  // 2. Cooldown : checked
-  // 3. Refund : check
 
   mapping(address => uint256) public alpieUserPurchased;
 
@@ -58,11 +54,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   mapping(address => PurchaseHistory) public userPurchaseHistory;
 
-
   /// @dev event
   event Mint(address indexed caller, uint256 indexed tokenId);
   event SetBaseURI(address indexed caller, string baseURI);
   event Reveal(address indexed caller, uint256 indexed startingIndex);
+  event Refund(address indexed caller, uint256 indexed amount);
 
   constructor(
     string memory _name,
@@ -80,7 +76,6 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     revealBlock = _revealBlock;
 
     // set immutatble variable
-
     maxPurchasePerWindow = 30;
     purchaseWindowSize = 100;
     maxAlpiePerAddress = 90;
@@ -133,38 +128,66 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     // 1.2 Per address 
     // 1.3 maxAlpies - totalSupply
     // 1.4 _amount
-
-    uint256 _maxPurchaseable = Math.min(maxinmumPurchaseable(msg.sender), _amount);
+    uint256 _purchaseableAmount = Math.min(maxinmumPurchaseable(msg.sender), _amount);
 
     // 2. Calcuate total price for check out
     uint256 _pricePerToken = priceModel.price();
+    uint256 _checkoutCost = _pricePerToken.mul(_purchaseableAmount);
 
-    uint256 _checkoutCost = _pricePerToken.mul(_maxPurchaseable);
+    require(_purchaseableAmount > 0, "Alpies::unpurchasable");
+    require(_checkoutCost <= msg.value, "Alpies::mint:: insufficent funds");
 
-    require(_maxPurchaseable > 0, "Alpies::unpurchasable");
-    require(_pricePerToken.mul(_maxPurchaseable) <= msg.value, "Alpies::mint:: insufficent funds");
-
-
-    // 3. Mint NFT per _maxPurchaseable and keep track of total price
-    for (uint256 i = 0; i < _maxPurchaseable; i++) {
-      uint256 mintIndex = totalSupply();
-      _mint(msg.sender, mintIndex);
-      emit Mint(msg.sender, mintIndex);
+    // 3. Mint NFT equal to _purchaseableAmount
+    for (uint256 i = 0; i < _purchaseableAmount; i++) {
+      uint256 _mintIndex = totalSupply();
+      _mint(msg.sender, _mintIndex);
+      emit Mint(msg.sender, _mintIndex);
     }
 
     // 4. Update user's stat
     // 4.1 update purchase per window per user
     // 4.2 update purchase per address
-
-    _updatePurchasePerUser(msg.sender, _maxPurchaseable);
-    _updateUserPurchaseWindow(msg.sender, _maxPurchaseable);
+    _updatePurchasePerUser(msg.sender, _purchaseableAmount);
+    _updateUserPurchaseWindow(msg.sender, _purchaseableAmount);
 
     // 5. Refund unused fund
-    // 5.1 emit event?
-    uint256 changes = msg.value.sub(_checkoutCost);
-    SafeToken.safeTransferETH(msg.sender, changes);
+    uint256 _changes = msg.value.sub(_checkoutCost);
+    if(_changes > 0){
+      SafeToken.safeTransferETH(msg.sender, _changes);
+      emit Refund(msg.sender, _changes);
+    }
+    
   }
 
+  /// @dev update the total amount of alpies that user has purchased
+  /// @param _buyer user address
+  /// @param _amount The amount of alpies that user can purchase
+  function _updatePurchasePerUser(address _buyer, uint256 _amount) internal {
+    alpieUserPurchased[_buyer] = alpieUserPurchased[_buyer].add(_amount);
+  }
+
+  /// @dev update user purchase history for current window
+  /// @param _buyer user address
+  /// @param _amount The amount of alpies that user purchased
+  function _updateUserPurchaseWindow(address _buyer, uint256 _amount) internal  {
+    PurchaseHistory storage _userPurchaseHistory = userPurchaseHistory[_buyer];
+    // if first purchase or start new window
+    // 1. update purchase amount
+    // 2. set new windowStartBlock
+    // else only update purchase amount
+    if (
+      isNewPurchaseWindow(_userPurchaseHistory) || 
+      _userPurchaseHistory.windowStartBlock == 0
+    ) {
+      _userPurchaseHistory.counter = _amount;
+      _userPurchaseHistory.windowStartBlock = block.number;
+    }else{
+      _userPurchaseHistory.counter = _userPurchaseHistory.counter.add(_amount);
+    }
+  }
+
+  /// @dev check how many alpies user can purchase in the current transaction
+  /// @param _buyer user address
   function maxinmumPurchaseable(address _buyer) public view returns (uint256) {
     // 1. Find max purchaseable. Minumum of the following
     // 1.1 Per window
@@ -176,32 +199,28 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     return Math.min(_maxPurchaseable, _supplyLeft);
   }
 
-  function _updatePurchasePerUser(address _buyer, uint256 _amount) internal {
-    alpieUserPurchased[_buyer] = alpieUserPurchased[_buyer].add(_amount);
-  }
-
-  function _updateUserPurchaseWindow(address _buyer, uint256 _amount) internal  {
-    PurchaseHistory storage _userPurchaseHistory = userPurchaseHistory[_buyer];
-    
-    _userPurchaseHistory.counter = _userPurchaseHistory.counter.add(_amount);
-
-    if (
-      uint256(block.number).sub(_userPurchaseHistory.windowStartBlock) > purchaseWindowSize || 
-      _userPurchaseHistory.windowStartBlock == 0
-    ) {
-      _userPurchaseHistory.counter = _amount;
-      _userPurchaseHistory.windowStartBlock = block.number;
-    }
-  }
-
+  /// @dev check how many alpies user can purchase in the current window
+  /// @param _buyer user address
   function _maxUserPurchaseInWindow(address _buyer) internal view returns (uint256) {
+    PurchaseHistory memory _userPurchaseHistory = userPurchaseHistory[_buyer];
+    if(isNewPurchaseWindow(_userPurchaseHistory)){
+      return maxPurchasePerWindow;
+    }
     uint256 _purchasedInThisWindow = userPurchaseHistory[_buyer].counter;
     return maxPurchasePerWindow.sub(_purchasedInThisWindow);
   }
 
+  /// @dev check how many alpies user can purchase until reach maxAlpiePerAddress
+  /// @param _buyer user address
   function _maxPurchaseblePerAddress(address _buyer) internal view returns (uint256) {
     uint256 _purchased = alpieUserPurchased[_buyer];
     return maxAlpiePerAddress.sub(_purchased);
+  }
+
+  /// @dev check if user latest purchase is in the same window
+  /// @param _userPurchaseHistory user purchasing history
+  function isNewPurchaseWindow(PurchaseHistory memory _userPurchaseHistory) internal view returns (bool){
+    return block.number.sub(_userPurchaseHistory.windowStartBlock) > purchaseWindowSize;
   }
 
   /// @dev Once called, starting index will be finalized.
