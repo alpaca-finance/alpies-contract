@@ -121,7 +121,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant onlyEOA {
     require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
-    require(bytes(provenanceHash).length != 0, "Alpies::setProvenanceHash:: provenanceHash not set");
+    require(bytes(provenanceHash).length != 0, "Alpies::mint:: provenanceHash not set");
 
     // 1. Find max purchaseable. Minumum of the following
     // 1.1 Per window
@@ -134,7 +134,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _pricePerToken = priceModel.price();
     uint256 _checkoutCost = _pricePerToken.mul(_purchaseableAmount);
 
-    require(_purchaseableAmount > 0, "Alpies::unpurchasable");
+    require(_purchaseableAmount > 0, "Alpies::mint:: unpurchasable");
     require(_checkoutCost <= msg.value, "Alpies::mint:: insufficent funds");
 
     // 3. Mint NFT equal to _purchaseableAmount

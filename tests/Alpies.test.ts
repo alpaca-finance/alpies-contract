@@ -15,7 +15,7 @@ type fixture = {
   evilContract: MockContractContext
 }
 
-const MAX_ALPIES = 35
+const MAX_ALPIES = 100
 const PREMINT_AMOUNT = 5
 const ALPIES_PRICE = ethers.utils.parseEther("1")
 const provenanceHash = "RANDOM_HASH"
@@ -24,7 +24,6 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   const [deployer] = await ethers.getSigners()
 
   // Deploy Fix PriceModel
-
   const FixedPriceModel = (await ethers.getContractFactory("FixedPriceModel", deployer)) as FixedPriceModel__factory
   const fixedPriceModel = await FixedPriceModel.deploy(
     (await latestBlockNumber()).add(1000),
@@ -99,6 +98,41 @@ describe("Alpies", () => {
       expect(await alpies.totalSupply()).to.be.eq(PREMINT_AMOUNT)
     })
   })
+
+  describe("#maxinmumPurchaseable", () => {
+    context("when call maxinmumPurchaseable for first purchase", () =>{
+      it("should return maxPurchasePerWindow amount",async () => {
+        const maxPurchasePerWindow = await alpies.maxPurchasePerWindow()
+        const maxPurchaseable = await alpies.maxinmumPurchaseable(aliceAddress)
+        expect(maxPurchaseable).to.eq(maxPurchasePerWindow)
+      })
+    })
+
+    context("when call maxinmumPurchaseable for later purchase", () =>{
+      it("should return maxmimum purchaseable amount",async () => {
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
+        // mint alpies
+        const amount = 1
+        await alpiesAsAlice.mint(amount, { value: ALPIES_PRICE.mul(amount)})
+        const maxPurchasePerWindow = await alpies.maxPurchasePerWindow()
+        // if maxPurchasePerWindow is 30
+        // alice already mint 1 NFT, thus she should be amount to mint another 29 NFTs
+        let maxPurchaseable = await alpies.maxinmumPurchaseable(aliceAddress)
+        expect(maxPurchaseable).to.eq(maxPurchasePerWindow.sub(amount))
+
+        // move block forward to pass alice purchaseWindowSize
+        const purchaseWindowSize = await alpies.purchaseWindowSize()
+        await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+        // alice's maxinmumPurchaseable should be reset
+        maxPurchaseable = await alpies.maxinmumPurchaseable(aliceAddress)
+        expect(maxPurchaseable).to.eq(maxPurchasePerWindow)
+      })
+    })
+  })
+
   describe("#mint", () => {
     context("when startBlock hasn't passed", async () => {
       it("should revert", async () => {
@@ -111,7 +145,7 @@ describe("Alpies", () => {
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // try to mint for NFT
-        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::setProvenanceHash:: provenanceHash not set")
+        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::mint:: provenanceHash not set")
       })
     })
 
@@ -121,26 +155,6 @@ describe("Alpies", () => {
         await alpies.setProvenanceHash(provenanceHash)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
-      })
-
-      describe("purchase amount > MAX_ALPIES_PURCHASE", () => {
-        it("should revert", async () => {
-          // Make gasPrice: 0 possible
-          await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 21 alpies
-          await expect(alpies.mint(21, { value: ALPIES_PRICE.mul(21), gasPrice: 0 })).to.be.revertedWith("Alpies::mint:: amount > MAX_ALPIES_PURCHASE")
-        })
-      })
-
-      describe("insufficient item to purchase", () => {
-        it("should revert", async () => {
-          // Make gasPrice: 0 possible
-          await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 20 alpies
-          await alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })
-          // Tring to mint another 20 should fail since there's only 10 left
-          await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("Alpies::mint:: sold out")
-        })
       })
 
       describe("insufficient fund", () => {
@@ -157,7 +171,7 @@ describe("Alpies", () => {
           await advanceBlockTo((await latestBlockNumber()).add(2000).toNumber())
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 20 alpies but provide only cost of 19 alpies
+          // Mint 20 alpies after sale ended
           await expect(alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })).to.be.revertedWith("Alpies::mint:: not in sale period")
         })
       })
@@ -183,6 +197,110 @@ describe("Alpies", () => {
           await alpies.mint(20, { value: ALPIES_PRICE.mul(20), gasPrice: 0 })
 
           expect(await alpies.totalSupply()).to.be.eq(PREMINT_AMOUNT + 20)
+          expect(await alpies.balanceOf(deployerAddress)).to.be.eq(PREMINT_AMOUNT + 20)
+        })
+
+        context("when user purchase more than maxPurchasePerWindow in the same window", () => {
+          it("should allow user to purchase until maxPurchasePerWindow and return unused fund", async () => {
+            // Make gasPrice: 0 possible
+            await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+            const maxPurchasePerWindow =  await alpies.maxPurchasePerWindow()
+
+            // Mint 15 alpies
+            await alpiesAsAlice.mint(15, { value: ALPIES_PRICE.mul(15), gasPrice: 0 })
+            let userPurchaseHistory = await alpies.userPurchaseHistory(aliceAddress)
+            expect(userPurchaseHistory.counter).to.eq(15)
+            expect(await alpies.balanceOf(aliceAddress)).to.eq(15)
+
+            // Mint another 30 alpies
+            // now alice should be able to mint only 15 alpies and get a refund
+            const balanceBefore = await alice.getBalance()
+            const mintTx = await alpiesAsAlice.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            const balanceAfter = await alice.getBalance()
+            userPurchaseHistory = await alpies.userPurchaseHistory(aliceAddress)
+
+            expect(userPurchaseHistory.counter).to.eq(maxPurchasePerWindow)
+            expect(await alpies.balanceOf(aliceAddress)).to.eq(maxPurchasePerWindow)
+            expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(15))
+            expect(mintTx).to.emit(alpies,"Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(15))
+          })
+        })
+
+        context("when user make another purchase after the window is reset", () => {
+          it("should allow user to purchase equal to maxPurchasePerWindow", async () => {
+            // Make gasPrice: 0 possible
+            await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+            const maxPurchasePerWindow =  await alpies.maxPurchasePerWindow()
+            const purchaseWindowSize = await alpies.purchaseWindowSize()
+
+            // Mint 15 alpies
+            await alpiesAsAlice.mint(15, { value: ALPIES_PRICE.mul(15), gasPrice: 0 })
+            // move block forward to pass alice purchaseWindowSize
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+            // Mint maxPurchasePerWindow alpies with no refund
+            const mintTx = await alpiesAsAlice.mint(maxPurchasePerWindow, { value: ALPIES_PRICE.mul(maxPurchasePerWindow), gasPrice: 0 })
+          
+            expect(await alpies.balanceOf(aliceAddress)).to.eq(maxPurchasePerWindow.add(15))
+            expect(mintTx).to.not.emit(alpies,"Refund")
+          })
+        })
+
+        context("when user purchase until maxAlpiePerAddress", () => {
+          it("should not allow user to purchase more", async () => {
+            // Make gasPrice: 0 possible
+            await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+            const purchaseWindowSize = await alpies.purchaseWindowSize()
+        
+            // alice mint 30 alpies
+            await alpiesAsAlice.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            expect(await alpies.alpieUserPurchased(aliceAddress)).to.eq(30)
+            // move block forward to pass alice purchaseWindowSize
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+
+            // alice mint 30 alpies
+            await alpiesAsAlice.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            expect(await alpies.alpieUserPurchased(aliceAddress)).to.eq(60)
+            // move block forward to pass alice purchaseWindowSize
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+
+            // alice mint 30 alpies
+            await alpiesAsAlice.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            expect(await alpies.alpieUserPurchased(aliceAddress)).to.eq(90)
+            // move block forward to pass alice purchaseWindowSize
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+
+            // should have alpies to left
+            // should not allow alice to purchase more
+            expect(await alpies.totalSupply()).to.lt(MAX_ALPIES)
+            await expect(alpiesAsAlice.mint(1, { value: ALPIES_PRICE.mul(1), gasPrice: 0 })).to.be.revertedWith("Alpies::mint:: unpurchasable")
+          })
+        })
+
+        context("when insufficient item to purchase", () => {
+          it("should allow user to purchase until sold out and return unused fund", async () => {
+            // Make gasPrice: 0 possible
+            await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+            // Mint 30 alpies
+            await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            // move block forward to pass alice purchaseWindowSize
+            const purchaseWindowSize = await alpies.purchaseWindowSize()
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+            // Mint 30 alpies
+            await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+            // Mint 30 alpies
+            await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
+            await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
+  
+            // Tring to mint another 10, but there's only 5 left
+            // alice should get 5 alpies and price*5 native tokens back
+            const balanceBefore = await alice.getBalance()
+            const mintTx = await alpiesAsAlice.mint(10, { value: ALPIES_PRICE.mul(10), gasPrice: 0 })
+            const balanceAfter = await alice.getBalance()
+            expect(await alpies.balanceOf(aliceAddress)).to.eq(5)
+            expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(5))
+            expect(mintTx).to.emit(alpies,"Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(5))
+          })
         })
       })
     })
@@ -205,8 +323,8 @@ describe("Alpies", () => {
           await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // Mint 20 alpies
-          let mintAmount = 20
+          // developer Mint 30 alpies with 95 NTFs left
+          let mintAmount = 30
           let currentSupply = await alpies.totalSupply();
           let mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
           // expect alpies to emit mint events equal to mint amount
@@ -214,8 +332,27 @@ describe("Alpies", () => {
             expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex);
           }
 
-          // Mint another 10 to triger sold out
-          mintAmount = 10
+          // alice Mint 30 alpies with 65 NTFs left
+          currentSupply = await alpies.totalSupply();
+          mintTx = await alpiesAsAlice.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
+          // expect alpies to emit mint events equal to mint amount
+          for(let mintIndex = currentSupply.toNumber(); mintIndex < currentSupply.toNumber()+mintAmount; mintIndex++){
+            expect(mintTx).to.emit(alpies, "Mint").withArgs(aliceAddress, mintIndex);
+          }
+
+          // bob Mint 30 alpies with 35 NTFs left
+          currentSupply = await alpies.totalSupply();
+          mintTx = await alpiesAsBob.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
+          // expect alpies to emit mint events equal to mint amount
+          for(let mintIndex = currentSupply.toNumber(); mintIndex < currentSupply.toNumber()+mintAmount; mintIndex++){
+            expect(mintTx).to.emit(alpies, "Mint").withArgs(bobAddress, mintIndex);
+          }
+
+          const purchaseWindowSize = await alpies.purchaseWindowSize()
+          // move block pass developer purchase window
+          await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize).toNumber())
+          // Mint another 5 to triger sold out
+          mintAmount = 5
           currentSupply = await alpies.totalSupply();
           mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
           // expect alpies to emit mint events equal to mint amount
@@ -227,6 +364,9 @@ describe("Alpies", () => {
           expect(revealTx).to.emit(alpies,"Reveal").withArgs(aliceAddress, startingIndex)
           expect(startingIndex).to.not.be.eq(0)
           await expect(alpiesAsAlice.reveal()).to.be.revertedWith("Alpies::reveal:: can't reveal again")
+
+          // try to mint after sold out
+          await expect(alpies.mint(1, { value: ALPIES_PRICE.mul(1), gasPrice: 0 })).to.be.revertedWith("Alpies::mint:: unpurchasable")
         })
       })
     })
