@@ -71,11 +71,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
     require(_maxAlpies > _premintAmount, "Alpies::constructor:: _maxAlpies < _premintAmount");
 
+    // set immutatble variable
     saleStartBlock = _priceModel.startBlock();
     saleEndBlock = _priceModel.endBlock();
     revealBlock = _revealBlock;
 
-    // set immutatble variable
     maxPurchasePerWindow = 30;
     purchaseWindowSize = 100;
     maxAlpiePerAddress = 90;
