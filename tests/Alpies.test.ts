@@ -131,6 +131,13 @@ describe("Alpies", () => {
       })
     })
 
+    context("When not the owner try to preMint", async () => {
+      it("should revert", async () => {
+        await alpies.setProvenanceHash(provenanceHash)
+        await expect(alpiesAsAlice.preMint(1)).to.reverted
+      })
+    })
+
     context("When try to preMint multiple times", async () => {
       it("should work", async () => {
         // Make gasPrice: 0 possible
