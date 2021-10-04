@@ -34,10 +34,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
 
-  uint256 public immutable maxPurchasePerWindow;
-  uint256 public immutable purchaseWindowSize;
+  uint256 public constant MAX_PURCHASE_PER_WINDOW = 30;
+  uint256 public constant PURCHASE_WINDOW_SIZE = 100;
 
-  uint256 public immutable maxAlpiePerAddress;
+  uint256 public constant MAX_ALPIES_PER_ADDRESS = 90;
 
   /// @dev states
   uint256 public startingIndex;
@@ -75,10 +75,6 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     saleStartBlock = _priceModel.startBlock();
     saleEndBlock = _priceModel.endBlock();
     revealBlock = _revealBlock;
-
-    maxPurchasePerWindow = 30;
-    purchaseWindowSize = 100;
-    maxAlpiePerAddress = 90;
 
     maxAlpies = _maxAlpies;
     premintAmount = _premintAmount;
@@ -190,6 +186,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     // 1.2 Per address
     // 1.3 maxAlpies - totalSupply
     uint256 _supplyLeft = maxAlpies.sub(totalSupply());
+    if (_supplyLeft == 0) return _supplyLeft;
     uint256 _maxPurchaseable = Math.min(_maxUserPurchaseInWindow(_buyer), _maxPurchaseblePerAddress(_buyer));
 
     return Math.min(_maxPurchaseable, _supplyLeft);
@@ -200,23 +197,23 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   function _maxUserPurchaseInWindow(address _buyer) internal view returns (uint256) {
     PurchaseHistory memory _userPurchaseHistory = userPurchaseHistory[_buyer];
     if (_isNewPurchaseWindow(_userPurchaseHistory)) {
-      return maxPurchasePerWindow;
+      return MAX_PURCHASE_PER_WINDOW;
     }
     uint256 _purchasedInThisWindow = userPurchaseHistory[_buyer].counter;
-    return maxPurchasePerWindow.sub(_purchasedInThisWindow);
+    return MAX_PURCHASE_PER_WINDOW.sub(_purchasedInThisWindow);
   }
 
-  /// @dev check how many alpies user can purchase until reach maxAlpiePerAddress
+  /// @dev check how many alpies user can purchase until reach MAX_ALPIES_PER_ADDRESS
   /// @param _buyer user address
   function _maxPurchaseblePerAddress(address _buyer) internal view returns (uint256) {
     uint256 _purchased = alpieUserPurchased[_buyer];
-    return maxAlpiePerAddress.sub(_purchased);
+    return MAX_ALPIES_PER_ADDRESS.sub(_purchased);
   }
 
   /// @dev check if user latest purchase is in the same window
   /// @param _userPurchaseHistory user purchasing history
   function _isNewPurchaseWindow(PurchaseHistory memory _userPurchaseHistory) internal view returns (bool) {
-    return block.number.sub(_userPurchaseHistory.windowStartBlock) > purchaseWindowSize;
+    return block.number.sub(_userPurchaseHistory.windowStartBlock) > PURCHASE_WINDOW_SIZE;
   }
 
   /// @dev Once called, starting index will be finalized.

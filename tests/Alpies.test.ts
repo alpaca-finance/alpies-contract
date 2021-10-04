@@ -108,8 +108,8 @@ describe("Alpies", () => {
 
   describe("#maximumPurchasable", () => {
     context("when call maximumPurchasable for first purchase", () => {
-      it("should return maxPurchasePerWindow amount", async () => {
-        const maxPurchasePerWindow = await alpies.maxPurchasePerWindow()
+      it("should return MAX_PURCHASE_PER_WINDOW amount", async () => {
+        const maxPurchasePerWindow = await alpies.MAX_PURCHASE_PER_WINDOW()
         const maxPurchaseable = await alpies.maximumPurchasable(aliceAddress)
         expect(maxPurchaseable).to.eq(maxPurchasePerWindow)
       })
@@ -124,14 +124,14 @@ describe("Alpies", () => {
         // mint alpies
         const amount = 1
         await alpiesAsAlice.mint(amount, { value: ALPIES_PRICE.mul(amount) })
-        const maxPurchasePerWindow = await alpies.maxPurchasePerWindow()
-        // if maxPurchasePerWindow is 30
+        const maxPurchasePerWindow = await alpies.MAX_PURCHASE_PER_WINDOW()
+        // if MAX_PURCHASE_PER_WINDOW is 30
         // alice already mint 1 NFT, thus she should be amount to mint another 29 NFTs
         let maxPurchaseable = await alpies.maximumPurchasable(aliceAddress)
         expect(maxPurchaseable).to.eq(maxPurchasePerWindow.sub(amount))
 
-        // move block forward to pass alice purchaseWindowSize
-        const purchaseWindowSize = await alpies.purchaseWindowSize()
+        // move block forward to pass alice PURCHASE_WINDOW_SIZE
+        const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
         await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
         // alice's maximumPurchasable should be reset
         maxPurchaseable = await alpies.maximumPurchasable(aliceAddress)
@@ -221,11 +221,11 @@ describe("Alpies", () => {
           }
         })
 
-        context("when user purchase more than maxPurchasePerWindow in the same window", () => {
-          it("should allow user to purchase until maxPurchasePerWindow and return unused fund", async () => {
+        context("when user purchase more than MAX_PURCHASE_PER_WINDOW in the same window", () => {
+          it("should allow user to purchase until MAX_PURCHASE_PER_WINDOW and return unused fund", async () => {
             // Make gasPrice: 0 possible
             await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-            const maxPurchasePerWindow = await alpies.maxPurchasePerWindow()
+            const maxPurchasePerWindow = await alpies.MAX_PURCHASE_PER_WINDOW()
 
             // Mint 15 alpies
             const firstMintTx = await alpiesAsAlice.mint(15, { value: ALPIES_PRICE.mul(15), gasPrice: 0 })
@@ -241,7 +241,7 @@ describe("Alpies", () => {
             const balanceAfter = await alice.getBalance()
             userPurchaseHistory = await alpies.userPurchaseHistory(aliceAddress)
 
-            // alice's counter in this window should equal to maxPurchasePerWindow
+            // alice's counter in this window should equal to MAX_PURCHASE_PER_WINDOW
             // alice's windowStartBlock should not reset
             // alice should get a refund
             expect(userPurchaseHistory.counter).to.eq(maxPurchasePerWindow)
@@ -253,15 +253,15 @@ describe("Alpies", () => {
         })
 
         context("when user make another purchase after the window is reset", () => {
-          it("should allow user to purchase equal to maxPurchasePerWindow", async () => {
+          it("should allow user to purchase equal to MAX_PURCHASE_PER_WINDOW", async () => {
             // Make gasPrice: 0 possible
             await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-            const maxPurchasePerWindow = await alpies.maxPurchasePerWindow()
-            const purchaseWindowSize = await alpies.purchaseWindowSize()
+            const maxPurchasePerWindow = await alpies.MAX_PURCHASE_PER_WINDOW()
+            const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
 
             // Mint 15 alpies
             await alpiesAsAlice.mint(15, { value: ALPIES_PRICE.mul(15), gasPrice: 0 })
-            // move block forward to pass alice purchaseWindowSize
+            // move block forward to pass alice PURCHASE_WINDOW_SIZE
             await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
             // Mint maxPurchasePerWindow alpies with no refund
             const mintTx = await alpiesAsAlice.mint(maxPurchasePerWindow, {
@@ -277,23 +277,23 @@ describe("Alpies", () => {
           })
         })
 
-        context("when user purchase until maxAlpiePerAddress", () => {
-          it("should not allow user to purchase more than maxAlpiePerAddress", async () => {
+        context("when user purchase until MAX_ALPIES_PER_ADDRESS", () => {
+          it("should not allow user to purchase more than MAX_ALPIES_PER_ADDRESS", async () => {
             // Make gasPrice: 0 possible
             await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-            const purchaseWindowSize = await alpies.purchaseWindowSize()
-            const maxAlpiePerAddress = await alpies.maxAlpiePerAddress()
+            const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
+            const maxAlpiePerAddress = await alpies.MAX_ALPIES_PER_ADDRESS()
 
             // alice mint 30 alpies
             await alpiesAsAlice.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
             expect(await alpies.alpieUserPurchased(aliceAddress)).to.eq(30)
-            // move block forward to pass alice purchaseWindowSize
+            // move block forward to pass alice PURCHASE_WINDOW_SIZE
             await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
 
             // alice mint 30 alpies
             await alpiesAsAlice.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
             expect(await alpies.alpieUserPurchased(aliceAddress)).to.eq(60)
-            // move block forward to pass alice purchaseWindowSize
+            // move block forward to pass alice PURCHASE_WINDOW_SIZE
             await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
 
             // alice mint 25 alpies
@@ -327,8 +327,8 @@ describe("Alpies", () => {
             await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
             // Mint 30 alpies
             await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
-            // move block forward to pass alice purchaseWindowSize
-            const purchaseWindowSize = await alpies.purchaseWindowSize()
+            // move block forward to pass alice PURCHASE_WINDOW_SIZE
+            const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
             await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
             // Mint 30 alpies
             await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
@@ -403,7 +403,7 @@ describe("Alpies", () => {
             expect(mintTx).to.emit(alpies, "Mint").withArgs(bobAddress, mintIndex)
           }
 
-          const purchaseWindowSize = await alpies.purchaseWindowSize()
+          const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
           // move block pass developer purchase window
           await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize).toNumber())
           // Mint another 5 to triger sold out
