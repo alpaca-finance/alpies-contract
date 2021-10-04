@@ -82,7 +82,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     maxAlpies = _maxAlpies;
     premintAmount = _premintAmount;
-  
+
     priceModel = _priceModel;
 
     for (uint256 i = 0; i < _premintAmount; i++) {
@@ -125,10 +125,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     // 1. Find max purchaseable. Minumum of the following
     // 1.1 Per window
-    // 1.2 Per address 
+    // 1.2 Per address
     // 1.3 maxAlpies - totalSupply
     // 1.4 _amount
-    uint256 _purchaseableAmount = Math.min(maxinmumPurchaseable(msg.sender), _amount);
+    uint256 _purchaseableAmount = Math.min(maximumPurchasable(msg.sender), _amount);
 
     // 2. Calcuate total price for check out
     uint256 _pricePerToken = priceModel.price();
@@ -152,11 +152,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     // 5. Refund unused fund
     uint256 _changes = msg.value.sub(_checkoutCost);
-    if(_changes > 0){
+    if (_changes != 0) {
       SafeToken.safeTransferETH(msg.sender, _changes);
       emit Refund(msg.sender, _changes);
     }
-    
   }
 
   /// @dev update the total amount of alpies that user has purchased
@@ -169,29 +168,26 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev update user purchase history for current window
   /// @param _buyer user address
   /// @param _amount The amount of alpies that user purchased
-  function _updateUserPurchaseWindow(address _buyer, uint256 _amount) internal  {
+  function _updateUserPurchaseWindow(address _buyer, uint256 _amount) internal {
     PurchaseHistory storage _userPurchaseHistory = userPurchaseHistory[_buyer];
     // if first purchase or start new window
     // 1. update purchase amount
     // 2. set new windowStartBlock
     // else only update purchase amount
-    if (
-      isNewPurchaseWindow(_userPurchaseHistory) || 
-      _userPurchaseHistory.windowStartBlock == 0
-    ) {
+    if (_isNewPurchaseWindow(_userPurchaseHistory) || _userPurchaseHistory.windowStartBlock == 0) {
       _userPurchaseHistory.counter = _amount;
       _userPurchaseHistory.windowStartBlock = block.number;
-    }else{
+    } else {
       _userPurchaseHistory.counter = _userPurchaseHistory.counter.add(_amount);
     }
   }
 
   /// @dev check how many alpies user can purchase in the current transaction
   /// @param _buyer user address
-  function maxinmumPurchaseable(address _buyer) public view returns (uint256) {
+  function maximumPurchasable(address _buyer) public view returns (uint256) {
     // 1. Find max purchaseable. Minumum of the following
     // 1.1 Per window
-    // 1.2 Per address 
+    // 1.2 Per address
     // 1.3 maxAlpies - totalSupply
     uint256 _supplyLeft = maxAlpies.sub(totalSupply());
     uint256 _maxPurchaseable = Math.min(_maxUserPurchaseInWindow(_buyer), _maxPurchaseblePerAddress(_buyer));
@@ -203,7 +199,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _buyer user address
   function _maxUserPurchaseInWindow(address _buyer) internal view returns (uint256) {
     PurchaseHistory memory _userPurchaseHistory = userPurchaseHistory[_buyer];
-    if(isNewPurchaseWindow(_userPurchaseHistory)){
+    if (_isNewPurchaseWindow(_userPurchaseHistory)) {
       return maxPurchasePerWindow;
     }
     uint256 _purchasedInThisWindow = userPurchaseHistory[_buyer].counter;
@@ -219,7 +215,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev check if user latest purchase is in the same window
   /// @param _userPurchaseHistory user purchasing history
-  function isNewPurchaseWindow(PurchaseHistory memory _userPurchaseHistory) internal view returns (bool){
+  function _isNewPurchaseWindow(PurchaseHistory memory _userPurchaseHistory) internal view returns (bool) {
     return block.number.sub(_userPurchaseHistory.windowStartBlock) > purchaseWindowSize;
   }
 
