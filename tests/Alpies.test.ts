@@ -23,7 +23,7 @@ type fixture = {
 }
 
 const MAX_ALPIES = 100
-const PREMINT_AMOUNT = 5
+const MAX_PREMINT_AMOUNT = 5
 const ALPIES_PRICE = ethers.utils.parseEther("1")
 const provenanceHash = "RANDOM_HASH"
 
@@ -48,7 +48,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     MAX_ALPIES,
     (await latestBlockNumber()).add(2000),
     fixedPriceModel.address,
-    PREMINT_AMOUNT
+    MAX_PREMINT_AMOUNT
   )
   await alpies.deployed()
 
@@ -102,7 +102,66 @@ describe("Alpies", () => {
 
   describe("#deploy", () => {
     it("should has correct states", async () => {
-      expect(await alpies.totalSupply()).to.be.eq(PREMINT_AMOUNT)
+      expect(await alpies.totalSupply()).to.be.eq(0)
+    })
+  })
+
+  describe("#preMint", () => {
+    context("When try to preMint after sale start", async () => {
+      it("should revert", async () => {
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+        await expect(alpies.preMint(5)).to.revertedWith("Alpies::preMint:: cannot premint after sale start")
+      })
+    })
+
+    context("When try to preMint after provenanceHash is set", async () => {
+      it("should revert", async () => {
+        await alpies.setProvenanceHash(provenanceHash)
+        await expect(alpies.preMint(5)).to.revertedWith("Alpies::preMint:: provenanceHash already set")
+      })
+    })
+
+    context("When try to preMint more than maxPremintAmount", async () => {
+      it("should revert", async () => {
+        await alpies.setProvenanceHash(provenanceHash)
+        await expect(alpies.preMint(MAX_PREMINT_AMOUNT + 1)).to.revertedWith(
+          "Alpies::preMint:: exceed maxPremintAmount"
+        )
+      })
+    })
+
+    context("When not the owner try to preMint", async () => {
+      it("should revert", async () => {
+        await alpies.setProvenanceHash(provenanceHash)
+        await expect(alpiesAsAlice.preMint(1)).to.reverted
+      })
+    })
+
+    context("When try to preMint multiple times", async () => {
+      it("should work", async () => {
+        // Make gasPrice: 0 possible
+        await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+        // premint 1 alpie
+        const preMintTx_1 = await alpies.preMint(1)
+        expect(await alpies.preMintCount()).to.eq(1)
+        expect(preMintTx_1).to.emit(alpies, "Mint").withArgs(deployerAddress, 0)
+        expect(preMintTx_1).to.emit(alpies, "PreMint").withArgs(deployerAddress, 1, 1)
+        // // premint 2 alpies
+        const preMintTx_2 = await alpies.preMint(2, { gasPrice: 0 })
+        expect(await alpies.preMintCount()).to.eq(3)
+        expect(preMintTx_2).to.emit(alpies, "Mint").withArgs(deployerAddress, 1)
+        expect(preMintTx_2).to.emit(alpies, "Mint").withArgs(deployerAddress, 2)
+        expect(preMintTx_2).to.emit(alpies, "PreMint").withArgs(deployerAddress, 3, 2)
+        // // premint 2 alpies
+        const preMintTx_3 = await alpies.preMint(2, { gasPrice: 0 })
+        expect(await alpies.preMintCount()).to.eq(5)
+        expect(await alpies.balanceOf(deployerAddress)).to.eq(5)
+        expect(await alpies.totalSupply()).to.be.eq(5)
+        expect(preMintTx_3).to.emit(alpies, "Mint").withArgs(deployerAddress, 3)
+        expect(preMintTx_3).to.emit(alpies, "Mint").withArgs(deployerAddress, 4)
+        expect(preMintTx_3).to.emit(alpies, "PreMint").withArgs(deployerAddress, 5, 2)
+      })
     })
   })
 
@@ -158,6 +217,8 @@ describe("Alpies", () => {
 
     context("when startBlock is passed", async () => {
       beforeEach(async () => {
+        // premint
+        await alpies.preMint(5)
         // setProvenanceHash
         await alpies.setProvenanceHash(provenanceHash)
         // move block forward to pass startBlock
@@ -207,10 +268,11 @@ describe("Alpies", () => {
           // Mint 20 alpies
           const mintAmount = 20
           const currentSupply = await alpies.totalSupply()
+          const preMintCount = (await alpies.preMintCount()).toNumber()
           const mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
 
-          expect(await alpies.totalSupply()).to.be.eq(PREMINT_AMOUNT + mintAmount)
-          expect(await alpies.balanceOf(deployerAddress)).to.be.eq(PREMINT_AMOUNT + mintAmount)
+          expect(await alpies.totalSupply()).to.be.eq(mintAmount + preMintCount)
+          expect(await alpies.balanceOf(deployerAddress)).to.be.eq(mintAmount + preMintCount)
           // expect alpies to emit mint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
@@ -325,6 +387,7 @@ describe("Alpies", () => {
           it("should allow user to purchase until sold out and return unused fund", async () => {
             // Make gasPrice: 0 possible
             await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+
             // Mint 30 alpies
             await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
             // move block forward to pass alice PURCHASE_WINDOW_SIZE
@@ -360,6 +423,8 @@ describe("Alpies", () => {
       })
       context("sold out", () => {
         it("should work", async () => {
+          // premint
+          await alpies.preMint(5)
           // setProvenanceHash
           await alpies.setProvenanceHash(provenanceHash)
           // move block forward to pass startBlock
@@ -512,38 +577,66 @@ describe("Alpies", () => {
   })
 
   describe("#alpiesId", () => {
-    beforeEach(async () => {
-      // setProvenanceHash
-      await alpies.setProvenanceHash(provenanceHash)
-      // move block forward to pass startBlock
-      await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
-    })
     context("when try to get alpiesId before reveal", () => {
       it("should revert", async () => {
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         await expect(alpies.alpiesId(0)).to.revertedWith("Alpies::alpiesId:: alpies not reveal yet")
       })
     })
     context("when try to get alpiesId after reveal", () => {
-      it("should work", async () => {
+      it("should work when premintCount = maxPremintAmount", async () => {
+        // premint
+        await alpies.preMint(MAX_PREMINT_AMOUNT)
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // move block forward to pass revealBlock
         await advanceBlockTo((await latestBlockNumber()).add(2000).toNumber())
         // reveal alpies
         await alpiesAsAlice.reveal()
         const startingIndex = await alpiesAsAlice.startingIndex()
         // mintIndex in premint set
-        let mintIndex = PREMINT_AMOUNT - 1
+        let mintIndex = MAX_PREMINT_AMOUNT - 1
         let alpiesId = await alpies.alpiesId(mintIndex)
         expect(alpiesId).to.eq(mintIndex)
 
         // mintIndex not in premint set
-        mintIndex = PREMINT_AMOUNT
-        alpiesId = await alpies.alpiesId(PREMINT_AMOUNT)
-        // ( (_mintIndex + startingIndex - premintAmount) % (maxAlpies - premintAmount) ) + premintAmount
+        const preMintCount = await alpies.preMintCount()
+        mintIndex = preMintCount.toNumber()
+        alpiesId = await alpies.alpiesId(preMintCount)
+        // ( (_mintIndex + startingIndex - premintCount) % (maxAlpies - premintCount) ) + premintCount
         const expectAlpiesId = BigNumber.from(mintIndex)
           .add(startingIndex)
-          .sub(PREMINT_AMOUNT)
-          .mod(BigNumber.from(MAX_ALPIES).sub(PREMINT_AMOUNT))
-          .add(PREMINT_AMOUNT)
+          .sub(preMintCount)
+          .mod(BigNumber.from(MAX_ALPIES).sub(preMintCount))
+          .add(preMintCount)
+        expect(alpiesId).to.eq(expectAlpiesId)
+      })
+
+      it("should work when premintCount = 0", async () => {
+        // setProvenanceHash
+        await alpies.setProvenanceHash(provenanceHash)
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+        // move block forward to pass revealBlock
+        await advanceBlockTo((await latestBlockNumber()).add(2000).toNumber())
+        // reveal alpies
+        await alpiesAsAlice.reveal()
+        const startingIndex = await alpiesAsAlice.startingIndex()
+
+        const preMintCount = await alpies.preMintCount()
+        const mintIndex = 0
+        const alpiesId = await alpies.alpiesId(preMintCount)
+        // ( (_mintIndex + startingIndex - premintCount) % (maxAlpies - premintCount) ) + premintCount
+        const expectAlpiesId = BigNumber.from(mintIndex)
+          .add(startingIndex)
+          .sub(preMintCount)
+          .mod(BigNumber.from(MAX_ALPIES).sub(preMintCount))
+          .add(preMintCount)
         expect(alpiesId).to.eq(expectAlpiesId)
       })
     })

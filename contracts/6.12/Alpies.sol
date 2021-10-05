@@ -29,10 +29,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev constants
   uint256 public immutable maxAlpies;
-  uint256 public immutable premintAmount;
   uint256 public immutable saleStartBlock;
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
+  uint256 public immutable maxPremintAmount;
 
   uint256 public constant MAX_PURCHASE_PER_WINDOW = 30;
   uint256 public constant PURCHASE_WINDOW_SIZE = 100;
@@ -42,6 +42,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev states
   uint256 public startingIndex;
   string public provenanceHash;
+  uint256 public preMintCount;
 
   IPriceModel public priceModel;
 
@@ -55,6 +56,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   mapping(address => PurchaseHistory) public userPurchaseHistory;
 
   /// @dev event
+  event PreMint(address indexed caller, uint256 preMintCount, uint256 preMintAmount);
   event Mint(address indexed caller, uint256 indexed tokenId);
   event SetBaseURI(address indexed caller, string baseURI);
   event Reveal(address indexed caller, uint256 indexed startingIndex);
@@ -66,10 +68,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _maxAlpies,
     uint256 _revealBlock,
     IPriceModel _priceModel,
-    uint256 _premintAmount
+    uint256 _maxPremintAmount
   ) public ERC721(_name, _symbol) {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
-    require(_maxAlpies > _premintAmount, "Alpies::constructor:: _maxAlpies < _premintAmount");
+    require(_maxAlpies > _maxPremintAmount, "Alpies::constructor:: _maxAlpies < _maxPremintAmount");
 
     // set immutatble variable
     saleStartBlock = _priceModel.startBlock();
@@ -77,14 +79,9 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     revealBlock = _revealBlock;
 
     maxAlpies = _maxAlpies;
-    premintAmount = _premintAmount;
+    maxPremintAmount = _maxPremintAmount;
 
     priceModel = _priceModel;
-
-    for (uint256 i = 0; i < _premintAmount; i++) {
-      _mint(msg.sender, i);
-      emit Mint(msg.sender, i);
-    }
   }
 
   /// @dev Require that the caller must be an EOA account to avoid flash loans.
@@ -111,6 +108,23 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _to The address to received funds
   function withdraw(address _to) external onlyOwner {
     SafeToken.safeTransferETH(_to, address(this).balance);
+  }
+
+  /// @dev Function to pre-mint Alpies
+  /// @param _preMintAmount The amount to be pre-minted
+  function preMint(uint256 _preMintAmount) external onlyOwner {
+    require(block.number < saleStartBlock, "Alpies::preMint:: cannot premint after sale start");
+    require(preMintCount.add(_preMintAmount) <= maxPremintAmount, "Alpies::preMint:: exceed maxPremintAmount");
+    require(bytes(provenanceHash).length == 0, "Alpies::preMint:: provenanceHash already set");
+
+    for (uint256 i = preMintCount; i < preMintCount.add(_preMintAmount); i++) {
+      _mint(msg.sender, i);
+      emit Mint(msg.sender, i);
+    }
+
+    preMintCount = preMintCount.add(_preMintAmount);
+
+    emit PreMint(msg.sender, preMintCount, _preMintAmount);
   }
 
   /// @dev Mint Alpies
@@ -239,10 +253,10 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   function alpiesId(uint256 _mintIndex) external view returns (uint256) {
     require(startingIndex != 0, "Alpies::alpiesId:: alpies not reveal yet");
     // if alpies in premint set
-    if (_mintIndex < premintAmount) return _mintIndex;
-    // ( (_mintIndex + startingIndex - premintAmount) % (maxAlpies - premintAmount) ) + premintAmount
-    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(premintAmount)).mod(maxAlpies.sub(premintAmount))).add(
-      premintAmount
+    if (_mintIndex < preMintCount) return _mintIndex;
+    // ( (_mintIndex + startingIndex - preMintCount) % (maxAlpies - preMintCount) ) + preMintCount
+    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(preMintCount)).mod(maxAlpies.sub(preMintCount))).add(
+      preMintCount
     );
     return _alpiesId;
   }
