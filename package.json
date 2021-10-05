@@ -1,5 +1,5 @@
 {
-  "name": "@alpaca-finance/alpaca-gang",
+  "name": "@alpaca-finance/alpies-contract",
   "version": "0.0.1",
   "scripts": {
     "hardhat": "hardhat",
