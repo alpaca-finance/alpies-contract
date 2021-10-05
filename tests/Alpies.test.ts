@@ -46,7 +46,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     "Alpies",
     "ALPIES",
     MAX_ALPIES,
-    (await latestBlockNumber()).add(2000),
+    (await latestBlockNumber()).add(1850),
     fixedPriceModel.address,
     MAX_PREMINT_AMOUNT
   )
@@ -103,6 +103,18 @@ describe("Alpies", () => {
   describe("#deploy", () => {
     it("should has correct states", async () => {
       expect(await alpies.totalSupply()).to.be.eq(0)
+    })
+  })
+
+  describe("#maxAlpies", () => {
+    context("When alpies are preminted", async () => {
+      it("should return correct maximum amount of alpies", async () => {
+        expect(await alpies.maxAlpies()).to.eq(MAX_ALPIES)
+
+        await alpies.preMint(1)
+        // should get MAX_ALPIES + minted amount
+        expect(await alpies.maxAlpies()).to.eq(MAX_ALPIES + 1)
+      })
     })
   })
 
@@ -400,13 +412,13 @@ describe("Alpies", () => {
             await alpies.mint(30, { value: ALPIES_PRICE.mul(30), gasPrice: 0 })
             await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize.add(1)).toNumber())
 
-            // Tring to mint another 10, but there's only 5 left
-            // alice should get 5 alpies and price*5 native tokens back
+            // Tring to mint another 15, but there's only 10 left
+            // alice should 10 alpies and price*5 native tokens back (only pay for 10 alpies)
             const balanceBefore = await alice.getBalance()
-            const mintTx = await alpiesAsAlice.mint(10, { value: ALPIES_PRICE.mul(10), gasPrice: 0 })
+            const mintTx = await alpiesAsAlice.mint(15, { value: ALPIES_PRICE.mul(15), gasPrice: 0 })
             const balanceAfter = await alice.getBalance()
-            expect(await alpies.balanceOf(aliceAddress)).to.eq(5)
-            expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(5))
+            expect(await alpies.balanceOf(aliceAddress)).to.eq(10)
+            expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(10))
             expect(mintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(5))
           })
         })
@@ -471,8 +483,8 @@ describe("Alpies", () => {
           const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
           // move block pass developer purchase window
           await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize).toNumber())
-          // Mint another 5 to triger sold out
-          mintAmount = 5
+          // Mint another 10 to triger sold out
+          mintAmount = 10
           currentSupply = await alpies.totalSupply()
           mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
           // expect alpies to emit mint events equal to mint amount
@@ -608,7 +620,7 @@ describe("Alpies", () => {
         const preMintCount = await alpies.preMintCount()
         mintIndex = preMintCount.toNumber()
         alpiesId = await alpies.alpiesId(preMintCount)
-        // ( (_mintIndex + startingIndex - premintCount) % (maxAlpies - premintCount) ) + premintCount
+        // ( (_mintIndex + startingIndex - preMintCount) % maxSaleAlpies ) + preMintCount
         const expectAlpiesId = BigNumber.from(mintIndex)
           .add(startingIndex)
           .sub(preMintCount)
@@ -631,7 +643,7 @@ describe("Alpies", () => {
         const preMintCount = await alpies.preMintCount()
         const mintIndex = 0
         const alpiesId = await alpies.alpiesId(preMintCount)
-        // ( (_mintIndex + startingIndex - premintCount) % (maxAlpies - premintCount) ) + premintCount
+        // ( (_mintIndex + startingIndex - preMintCount) % maxSaleAlpies ) + preMintCount
         const expectAlpiesId = BigNumber.from(mintIndex)
           .add(startingIndex)
           .sub(preMintCount)
