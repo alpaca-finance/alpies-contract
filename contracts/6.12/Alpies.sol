@@ -28,7 +28,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
 
   /// @dev constants
-  uint256 public immutable maxAlpies;
+  uint256 public immutable maxSaleAlpies;
   uint256 public immutable saleStartBlock;
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
@@ -65,20 +65,24 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   constructor(
     string memory _name,
     string memory _symbol,
-    uint256 _maxAlpies,
+    uint256 _maxSaleAlpies,
     uint256 _revealBlock,
     IPriceModel _priceModel,
     uint256 _maxPremintAmount
   ) public ERC721(_name, _symbol) {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
-    require(_maxAlpies > _maxPremintAmount, "Alpies::constructor:: _maxAlpies < _maxPremintAmount");
+    require(
+      _revealBlock < _priceModel.endBlock().add(100),
+      "Alpies::constructor:: revealBlock > saleEndBlock + buffer"
+    );
+    require(_maxSaleAlpies > _maxPremintAmount, "Alpies::constructor:: _maxSaleAlpies < _maxPremintAmount");
 
     // set immutatble variable
     saleStartBlock = _priceModel.startBlock();
     saleEndBlock = _priceModel.endBlock();
     revealBlock = _revealBlock;
 
-    maxAlpies = _maxAlpies;
+    maxSaleAlpies = _maxSaleAlpies;
     maxPremintAmount = _maxPremintAmount;
 
     priceModel = _priceModel;
@@ -108,6 +112,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _to The address to received funds
   function withdraw(address _to) external onlyOwner {
     SafeToken.safeTransferETH(_to, address(this).balance);
+  }
+
+  /// @dev Get maximum amount of alpies
+  function maxAlpies() public view returns (uint256) {
+    return maxSaleAlpies.add(preMintCount);
   }
 
   /// @dev Function to pre-mint Alpies
@@ -199,7 +208,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     // 1.1 Per window
     // 1.2 Per address
     // 1.3 maxAlpies - totalSupply
-    uint256 _supplyLeft = maxAlpies.sub(totalSupply());
+    uint256 _supplyLeft = maxAlpies().sub(totalSupply());
     if (_supplyLeft == 0) return _supplyLeft;
     uint256 _maxPurchaseable = Math.min(_maxUserPurchaseInWindow(_buyer), _maxPurchaseblePerAddress(_buyer));
 
@@ -234,12 +243,12 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   function reveal() external {
     require(startingIndex == 0, "Alpies::reveal:: can't reveal again");
     // If sold out before reveal block, can be revealed right away
-    if (totalSupply() < maxAlpies) {
+    if (totalSupply() < maxAlpies()) {
       require(block.number > revealBlock, "Alpies::reveal:: it's not time yet");
     }
 
     // Get the blockhash of the last block
-    startingIndex = uint256(blockhash(block.number - 1)) % maxAlpies;
+    startingIndex = uint256(blockhash(block.number - 1)) % maxSaleAlpies;
 
     // Prevent default sequence
     if (startingIndex == 0) {
@@ -254,10 +263,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     require(startingIndex != 0, "Alpies::alpiesId:: alpies not reveal yet");
     // if alpies in premint set
     if (_mintIndex < preMintCount) return _mintIndex;
-    // ( (_mintIndex + startingIndex - preMintCount) % (maxAlpies - preMintCount) ) + preMintCount
-    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(preMintCount)).mod(maxAlpies.sub(preMintCount))).add(
-      preMintCount
-    );
+    // ( (_mintIndex + startingIndex - preMintCount) % maxSaleAlpies ) + preMintCount
+    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(preMintCount)).mod(maxSaleAlpies)).add(preMintCount);
     return _alpiesId;
   }
 }
