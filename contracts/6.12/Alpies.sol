@@ -88,7 +88,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     priceModel = _priceModel;
   }
 
-  /// @dev Require that the caller must be an EOA account to avoid flash loans.
+  /// @dev Require that the caller must be an EOA account for preventing contract to acquire all alpies
   modifier onlyEOA() {
     require(msg.sender == tx.origin, "Alpies::onlyEOA:: not eoa");
     _;
