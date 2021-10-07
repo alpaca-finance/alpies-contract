@@ -56,11 +56,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   mapping(address => PurchaseHistory) public userPurchaseHistory;
 
   /// @dev event
-  event PreMint(address indexed caller, uint256 preMintCount, uint256 preMintAmount);
-  event Mint(address indexed caller, uint256 indexed tokenId);
-  event SetBaseURI(address indexed caller, string baseURI);
-  event Reveal(address indexed caller, uint256 indexed startingIndex);
-  event Refund(address indexed caller, uint256 indexed amount);
+  event LogPreMint(address indexed caller, uint256 preMintCount, uint256 preMintAmount);
+  event LogMint(address indexed caller, uint256 indexed tokenId);
+  event LogSetBaseURI(address indexed caller, string baseURI);
+  event LogReveal(address indexed caller, uint256 indexed startingIndex);
+  event LogRefund(address indexed caller, uint256 indexed amount);
 
   constructor(
     string memory _name,
@@ -98,7 +98,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _baseURI URI that will be used for every token meta data
   function setBaseURI(string memory _baseURI) external onlyOwner {
     _setBaseURI(_baseURI);
-    emit SetBaseURI(msg.sender, _baseURI);
+    emit LogSetBaseURI(msg.sender, _baseURI);
   }
 
   /// @dev set the provenanceHash
@@ -128,12 +128,12 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     for (uint256 i = preMintCount; i < preMintCount.add(_preMintAmount); i++) {
       _mint(msg.sender, i);
-      emit Mint(msg.sender, i);
+      emit LogMint(msg.sender, i);
     }
 
     preMintCount = preMintCount.add(_preMintAmount);
 
-    emit PreMint(msg.sender, preMintCount, _preMintAmount);
+    emit LogPreMint(msg.sender, preMintCount, _preMintAmount);
   }
 
   /// @dev Mint Alpies
@@ -160,7 +160,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     for (uint256 i = 0; i < _purchaseableAmount; i++) {
       uint256 _mintIndex = totalSupply();
       _mint(msg.sender, _mintIndex);
-      emit Mint(msg.sender, _mintIndex);
+      emit LogMint(msg.sender, _mintIndex);
     }
 
     // 4. Update user's stat
@@ -173,7 +173,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _changes = msg.value.sub(_checkoutCost);
     if (_changes != 0) {
       SafeToken.safeTransferETH(msg.sender, _changes);
-      emit Refund(msg.sender, _changes);
+      emit LogRefund(msg.sender, _changes);
     }
   }
 
@@ -254,7 +254,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     if (startingIndex == 0) {
       startingIndex = startingIndex.add(1);
     }
-    emit Reveal(msg.sender, startingIndex);
+    emit LogReveal(msg.sender, startingIndex);
   }
 
   /// @dev get alpiesId from mintIndex

@@ -157,22 +157,22 @@ describe("Alpies", () => {
         // premint 1 alpie
         const preMintTx_1 = await alpies.preMint(1)
         expect(await alpies.preMintCount()).to.eq(1)
-        expect(preMintTx_1).to.emit(alpies, "Mint").withArgs(deployerAddress, 0)
-        expect(preMintTx_1).to.emit(alpies, "PreMint").withArgs(deployerAddress, 1, 1)
+        expect(preMintTx_1).to.emit(alpies, "LogMint").withArgs(deployerAddress, 0)
+        expect(preMintTx_1).to.emit(alpies, "LogPreMint").withArgs(deployerAddress, 1, 1)
         // // premint 2 alpies
         const preMintTx_2 = await alpies.preMint(2, { gasPrice: 0 })
         expect(await alpies.preMintCount()).to.eq(3)
-        expect(preMintTx_2).to.emit(alpies, "Mint").withArgs(deployerAddress, 1)
-        expect(preMintTx_2).to.emit(alpies, "Mint").withArgs(deployerAddress, 2)
-        expect(preMintTx_2).to.emit(alpies, "PreMint").withArgs(deployerAddress, 3, 2)
+        expect(preMintTx_2).to.emit(alpies, "LogMint").withArgs(deployerAddress, 1)
+        expect(preMintTx_2).to.emit(alpies, "LogMint").withArgs(deployerAddress, 2)
+        expect(preMintTx_2).to.emit(alpies, "LogPreMint").withArgs(deployerAddress, 3, 2)
         // // premint 2 alpies
         const preMintTx_3 = await alpies.preMint(2, { gasPrice: 0 })
         expect(await alpies.preMintCount()).to.eq(5)
         expect(await alpies.balanceOf(deployerAddress)).to.eq(5)
         expect(await alpies.totalSupply()).to.be.eq(5)
-        expect(preMintTx_3).to.emit(alpies, "Mint").withArgs(deployerAddress, 3)
-        expect(preMintTx_3).to.emit(alpies, "Mint").withArgs(deployerAddress, 4)
-        expect(preMintTx_3).to.emit(alpies, "PreMint").withArgs(deployerAddress, 5, 2)
+        expect(preMintTx_3).to.emit(alpies, "LogMint").withArgs(deployerAddress, 3)
+        expect(preMintTx_3).to.emit(alpies, "LogMint").withArgs(deployerAddress, 4)
+        expect(preMintTx_3).to.emit(alpies, "LogPreMint").withArgs(deployerAddress, 5, 2)
       })
     })
   })
@@ -285,13 +285,13 @@ describe("Alpies", () => {
 
           expect(await alpies.totalSupply()).to.be.eq(mintAmount + preMintCount)
           expect(await alpies.balanceOf(deployerAddress)).to.be.eq(mintAmount + preMintCount)
-          // expect alpies to emit mint events equal to mint amount
+          // expect alpies to emit LogMint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
         })
 
@@ -322,7 +322,7 @@ describe("Alpies", () => {
             expect(userPurchaseHistory.windowStartBlock).to.eq(firstMintTx.blockNumber)
             expect(await alpies.balanceOf(aliceAddress)).to.eq(maxPurchasePerWindow)
             expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(15))
-            expect(secondMintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(15))
+            expect(secondMintTx).to.emit(alpies, "LogRefund").withArgs(aliceAddress, ALPIES_PRICE.mul(15))
           })
         })
 
@@ -347,7 +347,7 @@ describe("Alpies", () => {
             expect(await alpies.balanceOf(aliceAddress)).to.eq(maxPurchasePerWindow.add(15))
             expect(userPurchaseHistory.counter).to.eq(maxPurchasePerWindow)
             expect(userPurchaseHistory.windowStartBlock).to.eq(mintTx.blockNumber)
-            expect(mintTx).to.not.emit(alpies, "Refund")
+            expect(mintTx).to.not.emit(alpies, "LogRefund")
           })
         })
 
@@ -384,7 +384,7 @@ describe("Alpies", () => {
             // alice should get a refund of ALPIES_PRICE*10
             expect(await alpies.balanceOf(aliceAddress)).to.eq(maxAlpiePerAddress)
             expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(5))
-            expect(mintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(10))
+            expect(mintTx).to.emit(alpies, "LogRefund").withArgs(aliceAddress, ALPIES_PRICE.mul(10))
 
             // total supply should not reach MAX_ALPIES yet
             // should not allow alice to purchase more
@@ -419,7 +419,7 @@ describe("Alpies", () => {
             const balanceAfter = await alice.getBalance()
             expect(await alpies.balanceOf(aliceAddress)).to.eq(10)
             expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(10))
-            expect(mintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(5))
+            expect(mintTx).to.emit(alpies, "LogRefund").withArgs(aliceAddress, ALPIES_PRICE.mul(5))
           })
         })
       })
@@ -453,7 +453,7 @@ describe("Alpies", () => {
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
 
           // alice Mint 30 alpies with 65 NTFs left
@@ -465,19 +465,19 @@ describe("Alpies", () => {
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(aliceAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(aliceAddress, mintIndex)
           }
 
           // bob Mint 30 alpies with 35 NTFs left
           currentSupply = await alpies.totalSupply()
           mintTx = await alpiesAsBob.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
-          // expect alpies to emit mint events equal to mint amount
+          // expect alpies to emit LogMint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(bobAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(bobAddress, mintIndex)
           }
 
           const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
@@ -487,17 +487,17 @@ describe("Alpies", () => {
           mintAmount = 10
           currentSupply = await alpies.totalSupply()
           mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
-          // expect alpies to emit mint events equal to mint amount
+          // expect alpies to emit LogMint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
           const revealTx = await alpiesAsAlice.reveal()
           const startingIndex = await alpiesAsAlice.startingIndex()
-          expect(revealTx).to.emit(alpies, "Reveal").withArgs(aliceAddress, startingIndex)
+          expect(revealTx).to.emit(alpies, "LogReveal").withArgs(aliceAddress, startingIndex)
           expect(startingIndex).to.not.be.eq(0)
           await expect(alpiesAsAlice.reveal()).to.be.revertedWith("Alpies::reveal:: can't reveal again")
 
@@ -525,7 +525,7 @@ describe("Alpies", () => {
         it("should work", async () => {
           expect(await alpies.startingIndex()).to.be.eq(0)
           expect(await alpiesAsAlice.reveal())
-            .to.emit(alpies, "Reveal")
+            .to.emit(alpies, "LogReveal")
             .withArgs(aliceAddress, await alpies.startingIndex())
           expect(await alpies.startingIndex()).to.not.be.eq(0)
         })
