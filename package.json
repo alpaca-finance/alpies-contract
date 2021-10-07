@@ -1,7 +1,10 @@
 {
-  "name": "@alpaca-finance/alpaca-gang",
+  "name": "@alpaca-finance/alpies-contract",
   "version": "0.0.1",
   "scripts": {
+    "prepublish": "yarn build",
+    "build": "yarn run build:cjs",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
     "hardhat": "hardhat",
     "compile": "hardhat typechain --config hardhat.config.ts",
     "mainnet": "hardhat console --no-compile --network mainnet",
