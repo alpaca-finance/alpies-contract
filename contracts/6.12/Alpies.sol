@@ -41,7 +41,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev states
   uint256 public startingIndex;
-  string public provenanceHash;
+  string public birthCert;
+
   uint256 public reserveCount;
   uint256 public preMintCount;
 
@@ -109,11 +110,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     emit LogSetBaseURI(msg.sender, _baseURI);
   }
 
-  /// @dev set the provenanceHash
-  /// @param _provenancaHash SHA256 Digest of concatenated SHA256 of the sequence of images
-  function setProvenanceHash(string memory _provenancaHash) external onlyOwner {
-    require(bytes(provenanceHash).length == 0, "Alpies::setProvenanceHash:: provenanceHash already set");
-    provenanceHash = _provenancaHash;
+  /// @dev set the birthCert
+  /// @param _birthCert SHA256 Digest of concatenated SHA256 of the sequence of images
+  function setBirthCert(string memory _birthCert) external onlyOwner {
+    require(bytes(birthCert).length == 0, "Alpies::setBirthCert:: birthCert already set");
+    birthCert = _birthCert;
   }
 
   /// @dev Withdraw funds from minting gang member
@@ -131,7 +132,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _amount The amount to be minted
   function mintReserve(uint256 _amount) external onlyOwner beforeSaleStart {
     require(reserveCount.add(_amount) <= maxReserveAmount, "Alpies::mintReserve:: exceed maxReserveAmount");
-    require(bytes(provenanceHash).length == 0, "Alpies::mintReserve:: provenanceHash already set");
+    require(bytes(birthCert).length == 0, "Alpies::mintReserve:: birthCert already set");
     require(preMintCount == 0, "Alpies::mintReserve:: cannot mint reserve after premint");
 
     for (uint256 i = reserveCount; i < reserveCount.add(_amount); i++) {
@@ -163,7 +164,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant onlyEOA {
     require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
-    require(bytes(provenanceHash).length != 0, "Alpies::mint:: provenanceHash not set");
+    require(bytes(birthCert).length != 0, "Alpies::mint:: birthCert not set");
 
     // 1. Find max purchaseable. Minumum of the following
     // 1.1 Per window

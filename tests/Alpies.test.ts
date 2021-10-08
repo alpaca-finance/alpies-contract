@@ -25,7 +25,7 @@ type fixture = {
 const MAX_SALE_ALPIES = 100
 const MAX_RESERVE_AMOUNT = 5
 const ALPIES_PRICE = ethers.utils.parseEther("1")
-const provenanceHash = "RANDOM_HASH"
+const birthCert = "RANDOM_HASH"
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
@@ -127,10 +127,10 @@ describe("Alpies", () => {
       })
     })
 
-    context("When try to call mintReserve after provenanceHash is set", async () => {
+    context("When try to call mintReserve after birthCert is set", async () => {
       it("should revert", async () => {
-        await alpies.setProvenanceHash(provenanceHash)
-        await expect(alpies.mintReserve(5)).to.revertedWith("Alpies::mintReserve:: provenanceHash already set")
+        await alpies.setBirthCert(birthCert)
+        await expect(alpies.mintReserve(5)).to.revertedWith("Alpies::mintReserve:: birthCert already set")
       })
     })
 
@@ -240,8 +240,8 @@ describe("Alpies", () => {
       it("should return maxmimum purchaseable amount", async () => {
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // mint alpies
         const amount = 1
         await alpiesAsAlice.mint(amount, { value: ALPIES_PRICE.mul(amount) })
@@ -268,12 +268,12 @@ describe("Alpies", () => {
       })
     })
 
-    context("when the provenanceHash is not set", async () => {
+    context("when the birthCert is not set", async () => {
       it("should revert", async () => {
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // try to mint for NFT
-        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::mint:: provenanceHash not set")
+        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::mint:: birthCert not set")
       })
     })
 
@@ -281,8 +281,8 @@ describe("Alpies", () => {
       beforeEach(async () => {
         // mintReserve
         await alpies.mintReserve(5)
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
       })
@@ -487,8 +487,8 @@ describe("Alpies", () => {
         it("should work", async () => {
           // mintReserve
           await alpies.mintReserve(5)
-          // setProvenanceHash
-          await alpies.setProvenanceHash(provenanceHash)
+          // setBirthCert
+          await alpies.setBirthCert(birthCert)
           // move block forward to pass startBlock
           await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
           // Make gasPrice: 0 possible
@@ -592,8 +592,8 @@ describe("Alpies", () => {
 
     context("when owner call withdraw", () => {
       it("should work", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // mint alpies
@@ -611,29 +611,25 @@ describe("Alpies", () => {
     })
   })
 
-  describe("#setProvenanceHash", () => {
-    context("when owner call setProvenanceHash", () => {
+  describe("#setBirthCert", () => {
+    context("when owner call setBirthCert", () => {
       it("should work", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
-        // get provenanceHash from contract
-        const contractProvenanceHash = await alpies.provenanceHash()
-        expect(contractProvenanceHash).to.eq(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
+        // get birthCert from contract
+        const contractBirthCert = await alpies.birthCert()
+        expect(contractBirthCert).to.eq(birthCert)
       })
     })
 
-    context("when owner try to call setProvenanceHash more than once", () => {
+    context("when owner try to call setBirthCert more than once", () => {
       it("should revert", async () => {
-        // setProvenanceHash first time
-        await alpies.setProvenanceHash(provenanceHash)
-        // setProvenanceHash again
-        await expect(alpies.setProvenanceHash("newHash")).to.revertedWith(
-          "Alpies::setProvenanceHash:: provenanceHash already set"
-        )
-        // setProvenanceHash empty string again
-        await expect(alpies.setProvenanceHash("")).to.revertedWith(
-          "Alpies::setProvenanceHash:: provenanceHash already set"
-        )
+        // setBirthCert first time
+        await alpies.setBirthCert(birthCert)
+        // setBirthCert again
+        await expect(alpies.setBirthCert("newHash")).to.revertedWith("Alpies::setBirthCert:: birthCert already set")
+        // setBirthCert empty string again
+        await expect(alpies.setBirthCert("")).to.revertedWith("Alpies::setBirthCert:: birthCert already set")
       })
     })
   })
@@ -641,8 +637,8 @@ describe("Alpies", () => {
   describe("#alpiesId", () => {
     context("when try to get alpiesId before reveal", () => {
       it("should revert", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         await expect(alpies.alpiesId(0)).to.revertedWith("Alpies::alpiesId:: alpies not reveal yet")
@@ -654,8 +650,8 @@ describe("Alpies", () => {
         await alpies.mintReserve(MAX_RESERVE_AMOUNT)
         // preMint
         await alpies.preMint(10)
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // move block forward to pass revealBlock
@@ -685,8 +681,8 @@ describe("Alpies", () => {
       it("should work when reserveCount = 0", async () => {
         // preMint
         await alpies.preMint(10)
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // move block forward to pass revealBlock
