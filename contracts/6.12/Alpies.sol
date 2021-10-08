@@ -33,6 +33,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
   uint256 public immutable maxReserveAmount;
+  uint256 public immutable maxPremintAmount;
 
   uint256 public constant MAX_PURCHASE_PER_WINDOW = 30;
   uint256 public constant PURCHASE_WINDOW_SIZE = 100;
@@ -71,7 +72,8 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _maxSaleAlpies,
     uint256 _revealBlock,
     IPriceModel _priceModel,
-    uint256 _maxReserveAmount
+    uint256 _maxReserveAmount,
+    uint256 _maxPremintAmount
   ) public ERC721(_name, _symbol) {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
     require(
@@ -79,6 +81,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
       "Alpies::constructor:: revealBlock > saleEndBlock + buffer"
     );
     require(_maxSaleAlpies > _maxReserveAmount, "Alpies::constructor:: _maxSaleAlpies < _maxReserveAmount");
+    require(_maxSaleAlpies > _maxPremintAmount, "Alpies::constructor:: _maxSaleAlpies < _maxPremintAmount");
 
     // set immutatble variable
     saleStartBlock = _priceModel.startBlock();
@@ -87,6 +90,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
     maxSaleAlpies = _maxSaleAlpies;
     maxReserveAmount = _maxReserveAmount;
+    maxPremintAmount = _maxPremintAmount;
 
     priceModel = _priceModel;
   }
@@ -148,7 +152,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   /// @dev Function for preminting Alpies
   /// @param _amount The amount to be pre-minted
   function preMint(uint256 _amount) external onlyOwner beforeSaleStart {
-    require(maxAlpies() >= totalSupply().add(_amount), "Alpies::preMint:: exceed maxAlpies");
+    require(maxPremintAmount >= preMintCount.add(_amount), "Alpies::preMint:: exceed maxPremintAmount");
 
     for (uint256 i = 0; i < _amount; i++) {
       uint256 _mintIndex = totalSupply();

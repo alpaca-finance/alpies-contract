@@ -24,6 +24,7 @@ type fixture = {
 
 const MAX_SALE_ALPIES = 100
 const MAX_RESERVE_AMOUNT = 5
+const MAX_PREMINT_AMOUNT = 10
 const ALPIES_PRICE = ethers.utils.parseEther("1")
 const birthCert = "RANDOM_HASH"
 
@@ -48,7 +49,8 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     MAX_SALE_ALPIES,
     (await latestBlockNumber()).add(1850),
     fixedPriceModel.address,
-    MAX_RESERVE_AMOUNT
+    MAX_RESERVE_AMOUNT,
+    MAX_PREMINT_AMOUNT
   )
   await alpies.deployed()
 
@@ -191,9 +193,11 @@ describe("Alpies", () => {
       })
     })
 
-    context("When try to preMint more than maxSaleAlpies", async () => {
+    context("When try to preMint more than maxPremintAmount", async () => {
       it("should revert", async () => {
-        await expect(alpies.preMint(MAX_SALE_ALPIES + 1)).to.revertedWith("Alpies::preMint:: exceed maxAlpies")
+        await expect(alpies.preMint(MAX_PREMINT_AMOUNT + 1)).to.revertedWith(
+          "Alpies::preMint:: exceed maxPremintAmount"
+        )
       })
     })
 
