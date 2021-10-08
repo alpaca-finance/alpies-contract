@@ -22,10 +22,11 @@ type fixture = {
   evilContract: MockContractContext
 }
 
-const MAX_ALPIES = 100
-const MAX_PREMINT_AMOUNT = 5
+const MAX_SALE_ALPIES = 100
+const MAX_RESERVE_AMOUNT = 5
+const MAX_PREMINT_AMOUNT = 10
 const ALPIES_PRICE = ethers.utils.parseEther("1")
-const provenanceHash = "RANDOM_HASH"
+const birthCert = "RANDOM_HASH"
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
@@ -45,9 +46,10 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   const alpies = await Alpies.deploy(
     "Alpies",
     "ALPIES",
-    MAX_ALPIES,
+    MAX_SALE_ALPIES,
     (await latestBlockNumber()).add(1850),
     fixedPriceModel.address,
+    MAX_RESERVE_AMOUNT,
     MAX_PREMINT_AMOUNT
   )
   await alpies.deployed()
@@ -109,34 +111,90 @@ describe("Alpies", () => {
   describe("#maxAlpies", () => {
     context("When alpies are preminted", async () => {
       it("should return correct maximum amount of alpies", async () => {
-        expect(await alpies.maxAlpies()).to.eq(MAX_ALPIES)
+        expect(await alpies.maxAlpies()).to.eq(MAX_SALE_ALPIES)
 
-        await alpies.preMint(1)
+        await alpies.mintReserve(1)
         // should get MAX_ALPIES + minted amount
-        expect(await alpies.maxAlpies()).to.eq(MAX_ALPIES + 1)
+        expect(await alpies.maxAlpies()).to.eq(MAX_SALE_ALPIES + 1)
+      })
+    })
+  })
+
+  describe("#mintReserve", () => {
+    context("When try to call mintReserve after sale start", async () => {
+      it("should revert", async () => {
+        // move block forward to pass startBlock
+        await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+        await expect(alpies.mintReserve(5)).to.revertedWith("Alpies::beforeSaleStart:: not allow after sale start")
+      })
+    })
+
+    context("When try to call mintReserve after birthCert is set", async () => {
+      it("should revert", async () => {
+        await alpies.setBirthCert(birthCert)
+        await expect(alpies.mintReserve(5)).to.revertedWith("Alpies::mintReserve:: birthCert already set")
+      })
+    })
+
+    context("When try to mintReserve more than maxReserveAmount", async () => {
+      it("should revert", async () => {
+        await expect(alpies.mintReserve(MAX_RESERVE_AMOUNT + 1)).to.revertedWith(
+          "Alpies::mintReserve:: exceed maxReserveAmount"
+        )
+      })
+    })
+
+    context("When not the owner try to call mintReserve", async () => {
+      it("should revert", async () => {
+        await expect(alpiesAsAlice.mintReserve(1)).to.reverted
+      })
+    })
+
+    context("When try to mintReserve after preMint", async () => {
+      it("should revert", async () => {
+        await alpies.preMint(1)
+        await expect(alpies.mintReserve(2)).to.revertedWith("Alpies::mintReserve:: cannot mint reserve after premint")
+      })
+    })
+
+    context("When try to mintReserve multiple times", async () => {
+      it("should work", async () => {
+        // Make gasPrice: 0 possible
+        await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+        // mintReserve 1 alpie
+        const mintReserveTx_1 = await alpies.mintReserve(1)
+        expect(await alpies.reserveCount()).to.eq(1)
+        expect(mintReserveTx_1).to.emit(alpies, "LogMint").withArgs(deployerAddress, 0)
+        expect(mintReserveTx_1).to.emit(alpies, "LogMintReserve").withArgs(deployerAddress, 1, 1)
+        // // mintReserve 2 alpies
+        const mintReserveTx_2 = await alpies.mintReserve(2, { gasPrice: 0 })
+        expect(await alpies.reserveCount()).to.eq(3)
+        expect(mintReserveTx_2).to.emit(alpies, "LogMint").withArgs(deployerAddress, 1)
+        expect(mintReserveTx_2).to.emit(alpies, "LogMint").withArgs(deployerAddress, 2)
+        expect(mintReserveTx_2).to.emit(alpies, "LogMintReserve").withArgs(deployerAddress, 3, 2)
+        // // mintReserve 2 alpies
+        const mintReserveTx_3 = await alpies.mintReserve(2, { gasPrice: 0 })
+        expect(await alpies.reserveCount()).to.eq(5)
+        expect(await alpies.balanceOf(deployerAddress)).to.eq(5)
+        expect(await alpies.totalSupply()).to.be.eq(5)
+        expect(mintReserveTx_3).to.emit(alpies, "LogMint").withArgs(deployerAddress, 3)
+        expect(mintReserveTx_3).to.emit(alpies, "LogMint").withArgs(deployerAddress, 4)
+        expect(mintReserveTx_3).to.emit(alpies, "LogMintReserve").withArgs(deployerAddress, 5, 2)
       })
     })
   })
 
   describe("#preMint", () => {
-    context("When try to preMint after sale start", async () => {
+    context("When try to call preMint after sale start", async () => {
       it("should revert", async () => {
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
-        await expect(alpies.preMint(5)).to.revertedWith("Alpies::preMint:: cannot premint after sale start")
-      })
-    })
-
-    context("When try to preMint after provenanceHash is set", async () => {
-      it("should revert", async () => {
-        await alpies.setProvenanceHash(provenanceHash)
-        await expect(alpies.preMint(5)).to.revertedWith("Alpies::preMint:: provenanceHash already set")
+        await expect(alpies.preMint(5)).to.revertedWith("Alpies::beforeSaleStart:: not allow after sale start")
       })
     })
 
     context("When try to preMint more than maxPremintAmount", async () => {
       it("should revert", async () => {
-        await alpies.setProvenanceHash(provenanceHash)
         await expect(alpies.preMint(MAX_PREMINT_AMOUNT + 1)).to.revertedWith(
           "Alpies::preMint:: exceed maxPremintAmount"
         )
@@ -145,34 +203,30 @@ describe("Alpies", () => {
 
     context("When not the owner try to preMint", async () => {
       it("should revert", async () => {
-        await alpies.setProvenanceHash(provenanceHash)
-        await expect(alpiesAsAlice.preMint(1)).to.reverted
+        await expect(alpiesAsAlice.preMint(5)).to.reverted
       })
     })
 
-    context("When try to preMint multiple times", async () => {
+    context("When try to preMint", async () => {
       it("should work", async () => {
-        // Make gasPrice: 0 possible
-        await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-        // premint 1 alpie
-        const preMintTx_1 = await alpies.preMint(1)
-        expect(await alpies.preMintCount()).to.eq(1)
-        expect(preMintTx_1).to.emit(alpies, "Mint").withArgs(deployerAddress, 0)
-        expect(preMintTx_1).to.emit(alpies, "PreMint").withArgs(deployerAddress, 1, 1)
-        // // premint 2 alpies
-        const preMintTx_2 = await alpies.preMint(2, { gasPrice: 0 })
-        expect(await alpies.preMintCount()).to.eq(3)
-        expect(preMintTx_2).to.emit(alpies, "Mint").withArgs(deployerAddress, 1)
-        expect(preMintTx_2).to.emit(alpies, "Mint").withArgs(deployerAddress, 2)
-        expect(preMintTx_2).to.emit(alpies, "PreMint").withArgs(deployerAddress, 3, 2)
-        // // premint 2 alpies
-        const preMintTx_3 = await alpies.preMint(2, { gasPrice: 0 })
-        expect(await alpies.preMintCount()).to.eq(5)
-        expect(await alpies.balanceOf(deployerAddress)).to.eq(5)
-        expect(await alpies.totalSupply()).to.be.eq(5)
-        expect(preMintTx_3).to.emit(alpies, "Mint").withArgs(deployerAddress, 3)
-        expect(preMintTx_3).to.emit(alpies, "Mint").withArgs(deployerAddress, 4)
-        expect(preMintTx_3).to.emit(alpies, "PreMint").withArgs(deployerAddress, 5, 2)
+        // frist preMint
+        const preMintAmount = 5
+        const preMintTx_1 = await alpies.preMint(preMintAmount)
+        let preMintCount = await alpies.preMintCount()
+
+        expect(await alpies.balanceOf(deployerAddress)).to.eq(preMintAmount)
+        expect(preMintCount).to.eq(preMintAmount)
+        expect(preMintTx_1).to.emit(alpies, "LogPreMint").withArgs(deployerAddress, preMintAmount, preMintAmount)
+
+        // second preMint
+        const preMintTx_2 = await alpies.preMint(preMintAmount)
+        preMintCount = await alpies.preMintCount()
+
+        expect(await alpies.balanceOf(deployerAddress)).to.eq(preMintAmount * 2)
+        expect(preMintCount).to.eq(preMintAmount * 2)
+        expect(preMintTx_2)
+          .to.emit(alpies, "LogPreMint")
+          .withArgs(deployerAddress, preMintAmount * 2, preMintAmount)
       })
     })
   })
@@ -190,8 +244,8 @@ describe("Alpies", () => {
       it("should return maxmimum purchaseable amount", async () => {
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // mint alpies
         const amount = 1
         await alpiesAsAlice.mint(amount, { value: ALPIES_PRICE.mul(amount) })
@@ -218,21 +272,21 @@ describe("Alpies", () => {
       })
     })
 
-    context("when the provenanceHash is not set", async () => {
+    context("when the birthCert is not set", async () => {
       it("should revert", async () => {
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // try to mint for NFT
-        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::mint:: provenanceHash not set")
+        await expect(alpies.mint(1)).to.be.revertedWith("Alpies::mint:: birthCert not set")
       })
     })
 
     context("when startBlock is passed", async () => {
       beforeEach(async () => {
-        // premint
-        await alpies.preMint(5)
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // mintReserve
+        await alpies.mintReserve(5)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
       })
@@ -280,18 +334,18 @@ describe("Alpies", () => {
           // Mint 20 alpies
           const mintAmount = 20
           const currentSupply = await alpies.totalSupply()
-          const preMintCount = (await alpies.preMintCount()).toNumber()
+          const reserveCount = (await alpies.reserveCount()).toNumber()
           const mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
 
-          expect(await alpies.totalSupply()).to.be.eq(mintAmount + preMintCount)
-          expect(await alpies.balanceOf(deployerAddress)).to.be.eq(mintAmount + preMintCount)
-          // expect alpies to emit mint events equal to mint amount
+          expect(await alpies.totalSupply()).to.be.eq(mintAmount + reserveCount)
+          expect(await alpies.balanceOf(deployerAddress)).to.be.eq(mintAmount + reserveCount)
+          // expect alpies to emit LogMint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
         })
 
@@ -322,7 +376,7 @@ describe("Alpies", () => {
             expect(userPurchaseHistory.windowStartBlock).to.eq(firstMintTx.blockNumber)
             expect(await alpies.balanceOf(aliceAddress)).to.eq(maxPurchasePerWindow)
             expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(15))
-            expect(secondMintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(15))
+            expect(secondMintTx).to.emit(alpies, "LogRefund").withArgs(aliceAddress, ALPIES_PRICE.mul(15))
           })
         })
 
@@ -347,7 +401,7 @@ describe("Alpies", () => {
             expect(await alpies.balanceOf(aliceAddress)).to.eq(maxPurchasePerWindow.add(15))
             expect(userPurchaseHistory.counter).to.eq(maxPurchasePerWindow)
             expect(userPurchaseHistory.windowStartBlock).to.eq(mintTx.blockNumber)
-            expect(mintTx).to.not.emit(alpies, "Refund")
+            expect(mintTx).to.not.emit(alpies, "LogRefund")
           })
         })
 
@@ -384,11 +438,11 @@ describe("Alpies", () => {
             // alice should get a refund of ALPIES_PRICE*10
             expect(await alpies.balanceOf(aliceAddress)).to.eq(maxAlpiePerAddress)
             expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(5))
-            expect(mintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(10))
+            expect(mintTx).to.emit(alpies, "LogRefund").withArgs(aliceAddress, ALPIES_PRICE.mul(10))
 
             // total supply should not reach MAX_ALPIES yet
             // should not allow alice to purchase more
-            expect(await alpies.totalSupply()).to.lt(MAX_ALPIES)
+            expect(await alpies.totalSupply()).to.lt(MAX_SALE_ALPIES)
             await expect(alpiesAsAlice.mint(1, { value: ALPIES_PRICE.mul(1), gasPrice: 0 })).to.be.revertedWith(
               "Alpies::mint:: unpurchasable"
             )
@@ -419,7 +473,7 @@ describe("Alpies", () => {
             const balanceAfter = await alice.getBalance()
             expect(await alpies.balanceOf(aliceAddress)).to.eq(10)
             expect(balanceBefore.sub(balanceAfter)).to.eq(ALPIES_PRICE.mul(10))
-            expect(mintTx).to.emit(alpies, "Refund").withArgs(aliceAddress, ALPIES_PRICE.mul(5))
+            expect(mintTx).to.emit(alpies, "LogRefund").withArgs(aliceAddress, ALPIES_PRICE.mul(5))
           })
         })
       })
@@ -435,10 +489,10 @@ describe("Alpies", () => {
       })
       context("sold out", () => {
         it("should work", async () => {
-          // premint
-          await alpies.preMint(5)
-          // setProvenanceHash
-          await alpies.setProvenanceHash(provenanceHash)
+          // mintReserve
+          await alpies.mintReserve(5)
+          // setBirthCert
+          await alpies.setBirthCert(birthCert)
           // move block forward to pass startBlock
           await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
           // Make gasPrice: 0 possible
@@ -453,7 +507,7 @@ describe("Alpies", () => {
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
 
           // alice Mint 30 alpies with 65 NTFs left
@@ -465,19 +519,19 @@ describe("Alpies", () => {
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(aliceAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(aliceAddress, mintIndex)
           }
 
           // bob Mint 30 alpies with 35 NTFs left
           currentSupply = await alpies.totalSupply()
           mintTx = await alpiesAsBob.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
-          // expect alpies to emit mint events equal to mint amount
+          // expect alpies to emit LogMint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(bobAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(bobAddress, mintIndex)
           }
 
           const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
@@ -487,17 +541,17 @@ describe("Alpies", () => {
           mintAmount = 10
           currentSupply = await alpies.totalSupply()
           mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
-          // expect alpies to emit mint events equal to mint amount
+          // expect alpies to emit LogMint events equal to mint amount
           for (
             let mintIndex = currentSupply.toNumber();
             mintIndex < currentSupply.toNumber() + mintAmount;
             mintIndex++
           ) {
-            expect(mintTx).to.emit(alpies, "Mint").withArgs(deployerAddress, mintIndex)
+            expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
           const revealTx = await alpiesAsAlice.reveal()
           const startingIndex = await alpiesAsAlice.startingIndex()
-          expect(revealTx).to.emit(alpies, "Reveal").withArgs(aliceAddress, startingIndex)
+          expect(revealTx).to.emit(alpies, "LogReveal").withArgs(aliceAddress, startingIndex)
           expect(startingIndex).to.not.be.eq(0)
           await expect(alpiesAsAlice.reveal()).to.be.revertedWith("Alpies::reveal:: can't reveal again")
 
@@ -525,7 +579,7 @@ describe("Alpies", () => {
         it("should work", async () => {
           expect(await alpies.startingIndex()).to.be.eq(0)
           expect(await alpiesAsAlice.reveal())
-            .to.emit(alpies, "Reveal")
+            .to.emit(alpies, "LogReveal")
             .withArgs(aliceAddress, await alpies.startingIndex())
           expect(await alpies.startingIndex()).to.not.be.eq(0)
         })
@@ -542,8 +596,8 @@ describe("Alpies", () => {
 
     context("when owner call withdraw", () => {
       it("should work", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // mint alpies
@@ -561,29 +615,25 @@ describe("Alpies", () => {
     })
   })
 
-  describe("#setProvenanceHash", () => {
-    context("when owner call setProvenanceHash", () => {
+  describe("#setBirthCert", () => {
+    context("when owner call setBirthCert", () => {
       it("should work", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
-        // get provenanceHash from contract
-        const contractProvenanceHash = await alpies.provenanceHash()
-        expect(contractProvenanceHash).to.eq(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
+        // get birthCert from contract
+        const contractBirthCert = await alpies.birthCert()
+        expect(contractBirthCert).to.eq(birthCert)
       })
     })
 
-    context("when owner try to call setProvenanceHash more than once", () => {
+    context("when owner try to call setBirthCert more than once", () => {
       it("should revert", async () => {
-        // setProvenanceHash first time
-        await alpies.setProvenanceHash(provenanceHash)
-        // setProvenanceHash again
-        await expect(alpies.setProvenanceHash("newHash")).to.revertedWith(
-          "Alpies::setProvenanceHash:: provenanceHash already set"
-        )
-        // setProvenanceHash empty string again
-        await expect(alpies.setProvenanceHash("")).to.revertedWith(
-          "Alpies::setProvenanceHash:: provenanceHash already set"
-        )
+        // setBirthCert first time
+        await alpies.setBirthCert(birthCert)
+        // setBirthCert again
+        await expect(alpies.setBirthCert("newHash")).to.revertedWith("Alpies::setBirthCert:: birthCert already set")
+        // setBirthCert empty string again
+        await expect(alpies.setBirthCert("")).to.revertedWith("Alpies::setBirthCert:: birthCert already set")
       })
     })
   })
@@ -591,19 +641,21 @@ describe("Alpies", () => {
   describe("#alpiesId", () => {
     context("when try to get alpiesId before reveal", () => {
       it("should revert", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         await expect(alpies.alpiesId(0)).to.revertedWith("Alpies::alpiesId:: alpies not reveal yet")
       })
     })
     context("when try to get alpiesId after reveal", () => {
-      it("should work when premintCount = maxPremintAmount", async () => {
-        // premint
-        await alpies.preMint(MAX_PREMINT_AMOUNT)
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+      it("should work when reserveCount = maxReserveAmount", async () => {
+        // mintReserve
+        await alpies.mintReserve(MAX_RESERVE_AMOUNT)
+        // preMint
+        await alpies.preMint(10)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // move block forward to pass revealBlock
@@ -611,27 +663,30 @@ describe("Alpies", () => {
         // reveal alpies
         await alpiesAsAlice.reveal()
         const startingIndex = await alpiesAsAlice.startingIndex()
-        // mintIndex in premint set
-        let mintIndex = MAX_PREMINT_AMOUNT - 1
+        // mintIndex in reserve set
+        let mintIndex = MAX_RESERVE_AMOUNT - 1
         let alpiesId = await alpies.alpiesId(mintIndex)
         expect(alpiesId).to.eq(mintIndex)
 
-        // mintIndex not in premint set
-        const preMintCount = await alpies.preMintCount()
-        mintIndex = preMintCount.toNumber()
-        alpiesId = await alpies.alpiesId(preMintCount)
-        // ( (_mintIndex + startingIndex - preMintCount) % maxSaleAlpies ) + preMintCount
+        // mintIndex not in reserve set
+        const reserveCount = await alpies.reserveCount()
+        mintIndex = reserveCount.toNumber()
+        alpiesId = await alpies.alpiesId(reserveCount)
+
+        // ( (_mintIndex + startingIndex - reserveCount) % maxSaleAlpies ) + reserveCount
         const expectAlpiesId = BigNumber.from(mintIndex)
           .add(startingIndex)
-          .sub(preMintCount)
-          .mod(BigNumber.from(MAX_ALPIES).sub(preMintCount))
-          .add(preMintCount)
+          .sub(reserveCount)
+          .mod(BigNumber.from(MAX_SALE_ALPIES))
+          .add(reserveCount)
         expect(alpiesId).to.eq(expectAlpiesId)
       })
 
-      it("should work when premintCount = 0", async () => {
-        // setProvenanceHash
-        await alpies.setProvenanceHash(provenanceHash)
+      it("should work when reserveCount = 0", async () => {
+        // preMint
+        await alpies.preMint(10)
+        // setBirthCert
+        await alpies.setBirthCert(birthCert)
         // move block forward to pass startBlock
         await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
         // move block forward to pass revealBlock
@@ -640,15 +695,15 @@ describe("Alpies", () => {
         await alpiesAsAlice.reveal()
         const startingIndex = await alpiesAsAlice.startingIndex()
 
-        const preMintCount = await alpies.preMintCount()
+        const reserveCount = await alpies.reserveCount()
         const mintIndex = 0
-        const alpiesId = await alpies.alpiesId(preMintCount)
-        // ( (_mintIndex + startingIndex - preMintCount) % maxSaleAlpies ) + preMintCount
+        const alpiesId = await alpies.alpiesId(reserveCount)
+        // ( (_mintIndex + startingIndex - reserveCount) % maxSaleAlpies ) + reserveCount
         const expectAlpiesId = BigNumber.from(mintIndex)
           .add(startingIndex)
-          .sub(preMintCount)
-          .mod(BigNumber.from(MAX_ALPIES).sub(preMintCount))
-          .add(preMintCount)
+          .sub(reserveCount)
+          .mod(BigNumber.from(MAX_SALE_ALPIES))
+          .add(reserveCount)
         expect(alpiesId).to.eq(expectAlpiesId)
       })
     })

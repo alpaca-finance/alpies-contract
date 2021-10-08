@@ -32,6 +32,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   uint256 public immutable saleStartBlock;
   uint256 public immutable saleEndBlock;
   uint256 public immutable revealBlock;
+  uint256 public immutable maxReserveAmount;
   uint256 public immutable maxPremintAmount;
 
   uint256 public constant MAX_PURCHASE_PER_WINDOW = 30;
@@ -41,7 +42,9 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev states
   uint256 public startingIndex;
-  string public provenanceHash;
+  string public birthCert;
+
+  uint256 public reserveCount;
   uint256 public preMintCount;
 
   IPriceModel public priceModel;
@@ -56,11 +59,12 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   mapping(address => PurchaseHistory) public userPurchaseHistory;
 
   /// @dev event
-  event PreMint(address indexed caller, uint256 preMintCount, uint256 preMintAmount);
-  event Mint(address indexed caller, uint256 indexed tokenId);
-  event SetBaseURI(address indexed caller, string baseURI);
-  event Reveal(address indexed caller, uint256 indexed startingIndex);
-  event Refund(address indexed caller, uint256 indexed amount);
+  event LogMintReserve(address indexed caller, uint256 reserveCount, uint256 mintAmount);
+  event LogPreMint(address indexed caller, uint256 reserveCount, uint256 mintAmount);
+  event LogMint(address indexed caller, uint256 indexed tokenId);
+  event LogSetBaseURI(address indexed caller, string baseURI);
+  event LogReveal(address indexed caller, uint256 indexed startingIndex);
+  event LogRefund(address indexed caller, uint256 indexed amount);
 
   constructor(
     string memory _name,
@@ -68,6 +72,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _maxSaleAlpies,
     uint256 _revealBlock,
     IPriceModel _priceModel,
+    uint256 _maxReserveAmount,
     uint256 _maxPremintAmount
   ) public ERC721(_name, _symbol) {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
@@ -75,6 +80,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
       _revealBlock < _priceModel.endBlock().add(100),
       "Alpies::constructor:: revealBlock > saleEndBlock + buffer"
     );
+    require(_maxSaleAlpies > _maxReserveAmount, "Alpies::constructor:: _maxSaleAlpies < _maxReserveAmount");
     require(_maxSaleAlpies > _maxPremintAmount, "Alpies::constructor:: _maxSaleAlpies < _maxPremintAmount");
 
     // set immutatble variable
@@ -83,6 +89,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     revealBlock = _revealBlock;
 
     maxSaleAlpies = _maxSaleAlpies;
+    maxReserveAmount = _maxReserveAmount;
     maxPremintAmount = _maxPremintAmount;
 
     priceModel = _priceModel;
@@ -94,18 +101,24 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     _;
   }
 
+  /// @dev Ensure that the function is called before the sale start
+  modifier beforeSaleStart() {
+    require(block.number < saleStartBlock, "Alpies::beforeSaleStart:: not allow after sale start");
+    _;
+  }
+
   /// @dev set the base uri for the collection
   /// @param _baseURI URI that will be used for every token meta data
   function setBaseURI(string memory _baseURI) external onlyOwner {
     _setBaseURI(_baseURI);
-    emit SetBaseURI(msg.sender, _baseURI);
+    emit LogSetBaseURI(msg.sender, _baseURI);
   }
 
-  /// @dev set the provenanceHash
-  /// @param _provenancaHash SHA256 Digest of concatenated SHA256 of the sequence of images
-  function setProvenanceHash(string memory _provenancaHash) external onlyOwner {
-    require(bytes(provenanceHash).length == 0, "Alpies::setProvenanceHash:: provenanceHash already set");
-    provenanceHash = _provenancaHash;
+  /// @dev set the birthCert
+  /// @param _birthCert SHA256 Digest of concatenated SHA256 of the sequence of images
+  function setBirthCert(string memory _birthCert) external onlyOwner {
+    require(bytes(birthCert).length == 0, "Alpies::setBirthCert:: birthCert already set");
+    birthCert = _birthCert;
   }
 
   /// @dev Withdraw funds from minting gang member
@@ -116,31 +129,46 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
 
   /// @dev Get maximum amount of alpies
   function maxAlpies() public view returns (uint256) {
-    return maxSaleAlpies.add(preMintCount);
+    return maxSaleAlpies.add(reserveCount);
   }
 
-  /// @dev Function to pre-mint Alpies
-  /// @param _preMintAmount The amount to be pre-minted
-  function preMint(uint256 _preMintAmount) external onlyOwner {
-    require(block.number < saleStartBlock, "Alpies::preMint:: cannot premint after sale start");
-    require(preMintCount.add(_preMintAmount) <= maxPremintAmount, "Alpies::preMint:: exceed maxPremintAmount");
-    require(bytes(provenanceHash).length == 0, "Alpies::preMint:: provenanceHash already set");
+  /// @dev Function for minting reserved Alpies
+  /// @param _amount The amount to be minted
+  function mintReserve(uint256 _amount) external onlyOwner beforeSaleStart {
+    require(reserveCount.add(_amount) <= maxReserveAmount, "Alpies::mintReserve:: exceed maxReserveAmount");
+    require(bytes(birthCert).length == 0, "Alpies::mintReserve:: birthCert already set");
+    require(preMintCount == 0, "Alpies::mintReserve:: cannot mint reserve after premint");
 
-    for (uint256 i = preMintCount; i < preMintCount.add(_preMintAmount); i++) {
+    for (uint256 i = reserveCount; i < reserveCount.add(_amount); i++) {
       _mint(msg.sender, i);
-      emit Mint(msg.sender, i);
+      emit LogMint(msg.sender, i);
     }
 
-    preMintCount = preMintCount.add(_preMintAmount);
+    reserveCount = reserveCount.add(_amount);
 
-    emit PreMint(msg.sender, preMintCount, _preMintAmount);
+    emit LogMintReserve(msg.sender, reserveCount, _amount);
+  }
+
+  /// @dev Function for preminting Alpies
+  /// @param _amount The amount to be pre-minted
+  function preMint(uint256 _amount) external onlyOwner beforeSaleStart {
+    require(maxPremintAmount >= preMintCount.add(_amount), "Alpies::preMint:: exceed maxPremintAmount");
+
+    for (uint256 i = 0; i < _amount; i++) {
+      uint256 _mintIndex = totalSupply();
+      _mint(msg.sender, _mintIndex);
+      emit LogMint(msg.sender, _mintIndex);
+    }
+    preMintCount = preMintCount.add(_amount);
+
+    emit LogPreMint(msg.sender, preMintCount, _amount);
   }
 
   /// @dev Mint Alpies
   /// @param _amount The amount of tokens that users wish to buy
   function mint(uint256 _amount) external payable nonReentrant onlyEOA {
     require(block.number > saleStartBlock && block.number <= saleEndBlock, "Alpies::mint:: not in sale period");
-    require(bytes(provenanceHash).length != 0, "Alpies::mint:: provenanceHash not set");
+    require(bytes(birthCert).length != 0, "Alpies::mint:: birthCert not set");
 
     // 1. Find max purchaseable. Minumum of the following
     // 1.1 Per window
@@ -160,7 +188,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     for (uint256 i = 0; i < _purchaseableAmount; i++) {
       uint256 _mintIndex = totalSupply();
       _mint(msg.sender, _mintIndex);
-      emit Mint(msg.sender, _mintIndex);
+      emit LogMint(msg.sender, _mintIndex);
     }
 
     // 4. Update user's stat
@@ -173,7 +201,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     uint256 _changes = msg.value.sub(_checkoutCost);
     if (_changes != 0) {
       SafeToken.safeTransferETH(msg.sender, _changes);
-      emit Refund(msg.sender, _changes);
+      emit LogRefund(msg.sender, _changes);
     }
   }
 
@@ -254,7 +282,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     if (startingIndex == 0) {
       startingIndex = startingIndex.add(1);
     }
-    emit Reveal(msg.sender, startingIndex);
+    emit LogReveal(msg.sender, startingIndex);
   }
 
   /// @dev get alpiesId from mintIndex
@@ -262,9 +290,9 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   function alpiesId(uint256 _mintIndex) external view returns (uint256) {
     require(startingIndex != 0, "Alpies::alpiesId:: alpies not reveal yet");
     // if alpies in premint set
-    if (_mintIndex < preMintCount) return _mintIndex;
-    // ( (_mintIndex + startingIndex - preMintCount) % maxSaleAlpies ) + preMintCount
-    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(preMintCount)).mod(maxSaleAlpies)).add(preMintCount);
+    if (_mintIndex < reserveCount) return _mintIndex;
+    // ( (_mintIndex + startingIndex - reserveCount) % maxSaleAlpies ) + reserveCount
+    uint256 _alpiesId = ((_mintIndex.add(startingIndex).sub(reserveCount)).mod(maxSaleAlpies)).add(reserveCount);
     return _alpiesId;
   }
 }
