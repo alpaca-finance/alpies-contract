@@ -182,14 +182,14 @@ describe("Desending Price Model", () => {
       })
 
       describe("reached the thrid step", () => {
-        it("price should drop to pricefloor and prevent overflow", async () => {
+        it("price should drop to pricefloor", async () => {
           await advanceBlockTo(STARTBLOCK + 3 * BLOCKPERSTEP)
           expect(await priceModelAsAlice.price()).to.be.eq(FLOORPRICE)
         })
       })
 
       describe("reached floor before blockend", () => {
-        it("price should return priceFloor", async () => {
+        it("price should return priceFloor and prevent overflow", async () => {
           await advanceBlockTo(STARTBLOCK + 6 * BLOCKPERSTEP)
           expect(await priceModelAsAlice.price()).to.be.eq(FLOORPRICE)
         })
