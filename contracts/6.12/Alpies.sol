@@ -13,27 +13,28 @@ Alpaca Fin Corporation
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/math/Math.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./utils/SafeToken.sol";
 
 import "./interfaces/IPriceModel.sol";
 
-contract Alpies is ERC721, Ownable, ReentrancyGuard {
+contract Alpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgradeable, OwnableUpgradeable {
   /// @notice Libraries
-  using SafeMath for uint256;
+  using SafeMathUpgradeable for uint256;
 
   /// @dev constants
-  uint256 public immutable maxSaleAlpies;
-  uint256 public immutable saleStartBlock;
-  uint256 public immutable saleEndBlock;
-  uint256 public immutable revealBlock;
-  uint256 public immutable maxReserveAmount;
-  uint256 public immutable maxPremintAmount;
+  uint256 public maxSaleAlpies;
+  uint256 public saleStartBlock;
+  uint256 public saleEndBlock;
+  uint256 public revealBlock;
+  uint256 public maxReserveAmount;
+  uint256 public maxPremintAmount;
 
   uint256 public constant MAX_PURCHASE_PER_WINDOW = 30;
   uint256 public constant PURCHASE_WINDOW_SIZE = 100;
@@ -66,7 +67,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
   event LogReveal(address indexed caller, uint256 indexed startingIndex);
   event LogRefund(address indexed caller, uint256 indexed amount);
 
-  constructor(
+  function initialize(
     string memory _name,
     string memory _symbol,
     uint256 _maxSaleAlpies,
@@ -74,7 +75,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     IPriceModel _priceModel,
     uint256 _maxReserveAmount,
     uint256 _maxPremintAmount
-  ) public ERC721(_name, _symbol) {
+  ) public initializer {
     require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
     require(
       _revealBlock < _priceModel.endBlock().add(100),
@@ -83,7 +84,11 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     require(_maxSaleAlpies > _maxReserveAmount, "Alpies::constructor:: _maxSaleAlpies < _maxReserveAmount");
     require(_maxSaleAlpies > _maxPremintAmount, "Alpies::constructor:: _maxSaleAlpies < _maxPremintAmount");
 
-    // set immutatble variable
+    OwnableUpgradeable.__Ownable_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+    ERC721Upgradeable.__ERC721_init(_name, _symbol);
+
+    // set constant variables
     saleStartBlock = _priceModel.startBlock();
     saleEndBlock = _priceModel.endBlock();
     revealBlock = _revealBlock;
@@ -175,7 +180,7 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     // 1.2 Per address
     // 1.3 maxAlpies - totalSupply
     // 1.4 _amount
-    uint256 _purchaseableAmount = Math.min(maximumPurchasable(msg.sender), _amount);
+    uint256 _purchaseableAmount = MathUpgradeable.min(maximumPurchasable(msg.sender), _amount);
 
     // 2. Calcuate total price for check out
     uint256 _pricePerToken = priceModel.price();
@@ -238,9 +243,9 @@ contract Alpies is ERC721, Ownable, ReentrancyGuard {
     // 1.3 maxAlpies - totalSupply
     uint256 _supplyLeft = maxAlpies().sub(totalSupply());
     if (_supplyLeft == 0) return _supplyLeft;
-    uint256 _maxPurchaseable = Math.min(_maxUserPurchaseInWindow(_buyer), _maxPurchaseblePerAddress(_buyer));
+    uint256 _maxPurchaseable = MathUpgradeable.min(_maxUserPurchaseInWindow(_buyer), _maxPurchaseblePerAddress(_buyer));
 
-    return Math.min(_maxPurchaseable, _supplyLeft);
+    return MathUpgradeable.min(_maxPurchaseable, _supplyLeft);
   }
 
   /// @dev check how many alpies user can purchase in the current window
