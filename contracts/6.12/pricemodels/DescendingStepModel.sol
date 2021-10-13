@@ -56,6 +56,9 @@ contract DescendingStepModel is IPriceModel {
 
     uint256 _priceDelta = ((block.number.sub(startBlock)).div(blockPerStep)).mul(priceStep);
 
+    //prevent subtraction overflow
+    if (_priceDelta >= startPrice) return priceFloor;
+
     uint256 _updatedPrice = startPrice.sub(_priceDelta);
 
     if (_updatedPrice <= priceFloor) return priceFloor;
