@@ -51,10 +51,11 @@ contract DescendingStepModel is IPriceModel {
   /// @dev Get current price per token
   function price() external view override returns (uint256) {
     if (block.number <= startBlock) return startPrice;
-    // This should prevent overflow
-    if (block.number >= endBlock) return priceFloor;
 
     uint256 _priceDelta = ((block.number.sub(startBlock)).div(blockPerStep)).mul(priceStep);
+
+    //prevent subtraction overflow
+    if (_priceDelta > startPrice) return priceFloor;
 
     uint256 _updatedPrice = startPrice.sub(_priceDelta);
 
