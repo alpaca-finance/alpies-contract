@@ -1,4 +1,4 @@
-import { ethers, waffle, network } from "hardhat"
+import { ethers, waffle, network, upgrades } from "hardhat"
 import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
@@ -43,15 +43,15 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   // Deploy Alpies
   // Sale will start 1000 blocks from here and another 1000 blocks to reveal
   const Alpies = (await ethers.getContractFactory("Alpies", deployer)) as Alpies__factory
-  const alpies = await Alpies.deploy(
+  const alpies = (await upgrades.deployProxy(Alpies, [
     "Alpies",
     "ALPIES",
     MAX_SALE_ALPIES,
     (await latestBlockNumber()).add(1850),
     fixedPriceModel.address,
     MAX_RESERVE_AMOUNT,
-    MAX_PREMINT_AMOUNT
-  )
+    MAX_PREMINT_AMOUNT,
+  ])) as Alpies
   await alpies.deployed()
 
   // Setup MockContractContext
