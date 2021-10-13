@@ -1,5 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
+import { ethers, upgrades } from "hardhat"
+import { Alpies, Alpies__factory } from "../../../../typechain"
 
 interface IAlpiesInput {
   NAME: string
@@ -35,27 +37,22 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     MAX_PREMINT_AMOUNT: "",
   }
 
-  const { deployer } = await getNamedAccounts()
+  const Alpies = (await ethers.getContractFactory("Alpies", (await ethers.getSigners())[0])) as Alpies__factory
 
-  const alpies = await deploy("Alpies", {
-    from: deployer,
-    contract: "Alpies",
-    args: [
-      alpiesInput.NAME,
-      alpiesInput.SYMBOL,
-      alpiesInput.MAX_SALE_ALPIES,
-      alpiesInput.REVEAL_BLOCK,
-      alpiesInput.PRICE_MODEL,
-      alpiesInput.MAX_RESERVE,
-      alpiesInput.MAX_PREMINT_AMOUNT,
-    ],
-    log: true,
-    deterministicDeployment: false,
-    gasLimit: 5000000,
-  })
+  console.log(`>> Deploying Alpies${alpiesInput.NAME}`)
+
+  const alpies = (await upgrades.deployProxy(Alpies, [
+    alpiesInput.NAME,
+    alpiesInput.SYMBOL,
+    alpiesInput.MAX_SALE_ALPIES,
+    alpiesInput.REVEAL_BLOCK,
+    alpiesInput.PRICE_MODEL,
+    alpiesInput.MAX_RESERVE,
+    alpiesInput.MAX_PREMINT_AMOUNT,
+  ])) as Alpies
 
   console.log(">> Alpies is deployed!")
-  console.log("Alpies receipt", alpies.receipt)
+  console.log("Alpies deployTransaction", alpies.deployTransaction)
 }
 
 export default func
