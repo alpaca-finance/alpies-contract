@@ -28,7 +28,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const alpiesInput: IAlpiesInput = {
-    NAME: "Alpies",
+    NAME: "Dauntless Alpies",
     SYMBOL: "ALPIES",
     MAX_SALE_ALPIES: "",
     REVEAL_BLOCK: "",
@@ -39,7 +39,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const Alpies = (await ethers.getContractFactory("Alpies", (await ethers.getSigners())[0])) as Alpies__factory
 
-  console.log(`>> Deploying Alpies${alpiesInput.NAME}`)
+  console.log(`>> Deploying Alpies:${alpiesInput.NAME}`)
 
   const alpies = (await upgrades.deployProxy(Alpies, [
     alpiesInput.NAME,
