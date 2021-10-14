@@ -1,6 +1,6 @@
 {
   "name": "@alpaca-finance/alpies-contract",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "scripts": {
     "prepublish": "yarn build",
     "build": "yarn run build:cjs",
