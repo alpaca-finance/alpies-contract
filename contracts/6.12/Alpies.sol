@@ -226,7 +226,7 @@ contract Alpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgradeable,
     // 1. update purchase amount
     // 2. set new windowStartBlock
     // else only update purchase amount
-    if (_isNewPurchaseWindow(_userPurchaseHistory) || _userPurchaseHistory.windowStartBlock == 0) {
+    if (_isNewPurchaseWindow(_userPurchaseHistory)) {
       _userPurchaseHistory.counter = _amount;
       _userPurchaseHistory.windowStartBlock = block.number;
     } else {
