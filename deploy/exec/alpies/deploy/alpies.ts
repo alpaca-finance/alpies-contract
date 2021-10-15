@@ -52,7 +52,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])) as Alpies
 
   console.log(">> Alpies is deployed!")
-  console.log("Alpies deployTransaction", alpies.deployTransaction)
+  console.log("Alpies address", alpies.address)
 }
 
 export default func

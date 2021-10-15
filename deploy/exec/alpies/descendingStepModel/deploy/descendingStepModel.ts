@@ -1,6 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { parseEther } from "ethers/lib/utils"
+import { ethers } from "hardhat"
+import { DescendingStepModel__factory } from "../../../../../typechain"
 
 interface IDescendingStepModelInput {
   START_BLOCK: string
@@ -36,23 +38,24 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployer } = await getNamedAccounts()
 
-  const descendingStepModel = await deploy("DescendingStepModel", {
-    from: deployer,
-    contract: "DescendingStepModel",
-    args: [
-      descendingStepModelInput.START_BLOCK,
-      descendingStepModelInput.END_BLOCK,
-      descendingStepModelInput.BLOCK_PER_STEP,
-      descendingStepModelInput.PRICE_STEP,
-      descendingStepModelInput.START_PRICE,
-      descendingStepModelInput.PRICE_FLOOR,
-    ],
-    log: true,
-    deterministicDeployment: false,
-  })
+  const DescendingStepModel = (await ethers.getContractFactory(
+    "DescendingStepModel",
+    (
+      await ethers.getSigners()
+    )[0]
+  )) as DescendingStepModel__factory
+
+  const descendingStepModel = await DescendingStepModel.deploy(
+    descendingStepModelInput.START_BLOCK,
+    descendingStepModelInput.END_BLOCK,
+    descendingStepModelInput.BLOCK_PER_STEP,
+    descendingStepModelInput.PRICE_STEP,
+    descendingStepModelInput.START_PRICE,
+    descendingStepModelInput.PRICE_FLOOR
+  )
 
   console.log(">> DescendingStepModel is deployed!")
-  console.log("descendingStepModel receipt", descendingStepModel.receipt)
+  console.log("descendingStepModel address", descendingStepModel.address)
 }
 export default func
 func.tags = ["DescendingStepModel"]
