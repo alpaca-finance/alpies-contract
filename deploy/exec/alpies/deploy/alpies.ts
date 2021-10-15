@@ -28,7 +28,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const alpiesInput: IAlpiesInput = {
-    NAME: "Dauntless Alpies",
+    NAME: "Alpies",
     SYMBOL: "ALPIES",
     MAX_SALE_ALPIES: "",
     REVEAL_BLOCK: "",
