@@ -39,7 +39,7 @@ contract Rand is VRFConsumerBase, Ownable, ReentrancyGuard {
 
   /// @dev event
   event LogRand(address indexed caller, bytes32 indexed requestId);
-  event LogMark(uint256 _randIndex, address _address);
+  event LogMark(address owner, uint256 randIndex);
   event LogAlreadyMark();
 
   constructor(
@@ -99,7 +99,7 @@ contract Rand is VRFConsumerBase, Ownable, ReentrancyGuard {
     if (ticketInfo[_rand].mark == 0) {
       ticketInfo[_rand].mark = 1;
       whitelistTaken++;
-      LogMark(_rand, ticketInfo[_rand].owner);
+      LogMark(ticketInfo[_rand].owner, _rand);
     } else {
       LogAlreadyMark();
     }
