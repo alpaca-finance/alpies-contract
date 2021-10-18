@@ -14,9 +14,6 @@ interface IDescendingStepModelInput {
 }
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts, network } = hre
-  const { deploy } = deployments
-
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -28,15 +25,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const descendingStepModelInput: IDescendingStepModelInput = {
-    START_BLOCK: "",
-    END_BLOCK: "",
+    START_BLOCK: "11910350",
+    END_BLOCK: "12111950",
     BLOCK_PER_STEP: "1200",
     PRICE_STEP: parseEther("0.1576").toString(),
     START_PRICE: parseEther("8.88").toString(),
     PRICE_FLOOR: parseEther("1").toString(),
   }
-
-  const { deployer } = await getNamedAccounts()
 
   const DescendingStepModel = (await ethers.getContractFactory(
     "DescendingStepModel",
