@@ -12,8 +12,8 @@ const { AddressZero } = ethers.constants
 const { parseEther, formatBytes32String } = ethers.utils
 
 const BLOCKPERSTEP = 50
-const STARTBLOCK = 500
-const ENDBLOCK = 1000
+let STARTBLOCK: number
+let ENDBLOCK: number
 const PRICESTEP = ethers.utils.parseEther("0.2")
 const STARTPRICE = ethers.utils.parseEther("1")
 const FLOORPRICE = ethers.utils.parseEther("0.5")
@@ -28,6 +28,11 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     "DescendingStepModel",
     deployer
   )) as DescendingStepModel__factory
+
+  const currentBlock = await latestBlockNumber()
+
+  STARTBLOCK = currentBlock.toNumber() + 500
+  ENDBLOCK = currentBlock.toNumber() + 1000
   const descendingStepModel = await DescendingStepModel.deploy(
     STARTBLOCK,
     ENDBLOCK,
