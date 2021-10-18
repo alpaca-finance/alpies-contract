@@ -2,7 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { parseEther } from "ethers/lib/utils"
 import { ethers } from "hardhat"
-import { DescendingStepModel__factory } from "../../../../../typechain"
+import { DescendingStepModel__factory } from "../../../../typechain"
 
 interface IDescendingStepModelInput {
   START_BLOCK: string
