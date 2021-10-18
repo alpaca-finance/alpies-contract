@@ -16,22 +16,22 @@ type fixture = {
   fixedPriceModel: FixedPriceModel
 }
 
-
+let STARTBLOCK: number
+let ENDBLOCK: number
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
+  const currentBlock = await latestBlockNumber()
+  STARTBLOCK = currentBlock.toNumber() + 500
+  ENDBLOCK = currentBlock.toNumber() + 1000
   const FixedPriceModel = (await ethers.getContractFactory("FixedPriceModel", deployer)) as FixedPriceModel__factory
-  const fixedPriceModel = await FixedPriceModel.deploy(
-    (await latestBlockNumber()).add(1000),
-    (await latestBlockNumber()).add(1800),
-    PRICE
-  )
+  const fixedPriceModel = await FixedPriceModel.deploy(STARTBLOCK, ENDBLOCK, PRICE)
   await fixedPriceModel.deployed()
 
   return { fixedPriceModel }
 }
 
-describe("Desending Price Model", () => {
+describe("Fixed Price Model", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
@@ -53,14 +53,14 @@ describe("Desending Price Model", () => {
 
   context("Contract Deployed Correctly", async () => {
     beforeEach(async () => {
-      ; ({ fixedPriceModel } = await waffle.loadFixture(loadFixtureHandler))
-        ;[deployer, alice, bob, dev] = await ethers.getSigners()
-        ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
-          deployer.getAddress(),
-          alice.getAddress(),
-          bob.getAddress(),
-          dev.getAddress(),
-        ])
+      ;({ fixedPriceModel } = await waffle.loadFixture(loadFixtureHandler))
+      ;[deployer, alice, bob, dev] = await ethers.getSigners()
+      ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
+        deployer.getAddress(),
+        alice.getAddress(),
+        bob.getAddress(),
+        dev.getAddress(),
+      ])
 
       priceModelAsAlice = FixedPriceModel__factory.connect(fixedPriceModel.address, alice) as FixedPriceModel
       priceModelAsBob = FixedPriceModel__factory.connect(fixedPriceModel.address, bob) as FixedPriceModel
@@ -72,17 +72,16 @@ describe("Desending Price Model", () => {
       })
 
       it("all users should see the same price", async () => {
-        expect(await priceModelAsAlice.price()).to.be.eq((await priceModelAsBob.price()))
+        expect(await priceModelAsAlice.price()).to.be.eq(await priceModelAsBob.price())
       })
     })
-
 
     context("time passed", () => {
       describe("price", () => {
         it("should stay the same", async () => {
-          const startPrice = (await priceModelAsAlice.price())
-          await advanceBlockTo(1000)
-          const afterPrice =  (await priceModelAsAlice.price())
+          const startPrice = await priceModelAsAlice.price()
+          await advanceBlockTo(STARTBLOCK + 1000)
+          const afterPrice = await priceModelAsAlice.price()
           expect(startPrice).to.be.eq(afterPrice)
         })
       })
