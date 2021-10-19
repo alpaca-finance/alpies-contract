@@ -5,12 +5,16 @@ import { MockProvider, solidity } from "ethereum-waffle"
 import {
   Alpies,
   Alpies__factory,
+  DreamerAlpies,
+  DreamerAlpies__factory,
   FixedPriceModel,
   FixedPriceModel__factory,
   MockContractContext,
   MockContractContext__factory,
 } from "../typechain"
 import { advanceBlockTo, latestBlockNumber } from "./helpers/time"
+import { IClaim, parseBalanceMap } from "../utils/merkle/parse-balance-map"
+import { formatBigNumber } from "../utils/format"
 
 chai.use(solidity)
 const { expect } = chai
@@ -18,18 +22,34 @@ const { AddressZero } = ethers.constants
 const { parseEther, formatBytes32String } = ethers.utils
 
 type fixture = {
-  alpies: Alpies
+  alpies: DreamerAlpies
   evilContract: MockContractContext
+  claims: IClaim
 }
 
-const MAX_SALE_ALPIES = 100
+// Set MAX_SALE_ALPIES to 100 + CLAIMABLE_ALPIES for easy testing
+// as previous testcase base on 100 max Alpies
+const CLAIMABLE_ALPIES = ethers.BigNumber.from(6)
+const MAX_SALE_ALPIES = 106
 const MAX_RESERVE_AMOUNT = 5
 const MAX_PREMINT_AMOUNT = 10
 const ALPIES_PRICE = ethers.utils.parseEther("1")
 const birthCert = "RANDOM_HASH"
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
-  const [deployer] = await ethers.getSigners()
+  const [deployer, alice, bob, eve] = await ethers.getSigners()
+  const [deployerAddress, aliceAddress, bobAddress, eveAddress] = await Promise.all([
+    deployer.getAddress(),
+    alice.getAddress(),
+    bob.getAddress(),
+    eve.getAddress(),
+  ])
+
+  const { claims, merkleRoot, tokenTotal } = parseBalanceMap({
+    [aliceAddress]: formatBigNumber(2, "purehex"),
+    [bobAddress]: formatBigNumber(3, "purehex"),
+    [eveAddress]: formatBigNumber(1, "purehex"),
+  })
 
   // Deploy Fix PriceModel
   const FixedPriceModel = (await ethers.getContractFactory("FixedPriceModel", deployer)) as FixedPriceModel__factory
@@ -42,7 +62,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   // Deploy Alpies
   // Sale will start 1000 blocks from here and another 1000 blocks to reveal
-  const Alpies = (await ethers.getContractFactory("Alpies", deployer)) as Alpies__factory
+  const Alpies = (await ethers.getContractFactory("DreamerAlpies", deployer)) as DreamerAlpies__factory
   const alpies = (await upgrades.deployProxy(Alpies, [
     "Alpies",
     "ALPIES",
@@ -51,7 +71,9 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     fixedPriceModel.address,
     MAX_RESERVE_AMOUNT,
     MAX_PREMINT_AMOUNT,
-  ])) as Alpies
+    merkleRoot,
+    CLAIMABLE_ALPIES,
+  ])) as DreamerAlpies
   await alpies.deployed()
 
   // Setup MockContractContext
@@ -62,49 +84,117 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   const evilContract = await MockContractContext.deploy()
   await evilContract.deployed()
 
-  return { alpies, evilContract }
+  return { alpies, evilContract, claims }
 }
 
-describe("Alpies", () => {
+describe("DreamerAlpies", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
   let bob: Signer
-  let dev: Signer
+  let eve: Signer
 
   // Account Addresses
   let deployerAddress: string
   let aliceAddress: string
   let bobAddress: string
-  let devAddress: string
+  let eveAddress: string
+
+  // Merkle
+  let claims: IClaim
 
   // Contracts
-  let alpies: Alpies
+  let alpies: DreamerAlpies
   let evilContract: MockContractContext
 
   // Signer
-  let alpiesAsDeployer: Alpies
-  let alpiesAsAlice: Alpies
-  let alpiesAsBob: Alpies
+  let alpiesAsDeployer: DreamerAlpies
+  let alpiesAsAlice: DreamerAlpies
+  let alpiesAsBob: DreamerAlpies
 
   beforeEach(async () => {
-    ;({ alpies, evilContract } = await waffle.loadFixture(loadFixtureHandler))
-    ;[deployer, alice, bob, dev] = await ethers.getSigners()
-    ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
+    ;({ alpies, evilContract, claims } = await waffle.loadFixture(loadFixtureHandler))
+    ;[deployer, alice, bob, eve] = await ethers.getSigners()
+    ;[deployerAddress, aliceAddress, bobAddress, eveAddress] = await Promise.all([
       deployer.getAddress(),
       alice.getAddress(),
       bob.getAddress(),
-      dev.getAddress(),
+      eve.getAddress(),
     ])
 
-    alpiesAsAlice = Alpies__factory.connect(alpies.address, alice) as Alpies
-    alpiesAsBob = Alpies__factory.connect(alpies.address, bob) as Alpies
-    alpiesAsDeployer = Alpies__factory.connect(alpies.address, deployer) as Alpies
+    alpiesAsAlice = DreamerAlpies__factory.connect(alpies.address, alice)
+    alpiesAsBob = DreamerAlpies__factory.connect(alpies.address, bob)
+    alpiesAsDeployer = DreamerAlpies__factory.connect(alpies.address, deployer)
   })
 
   describe("#deploy", () => {
     it("should has correct states", async () => {
+      expect(await alpies.claimableAlpies()).to.be.eq(CLAIMABLE_ALPIES)
       expect(await alpies.totalSupply()).to.be.eq(0)
+    })
+  })
+
+  describe("#claimAlpies", () => {
+    context("when users submit invalid proof", async () => {
+      it("should revert", async () => {
+        await expect(
+          alpies.claimAlpies(
+            claims[aliceAddress].index,
+            aliceAddress,
+            claims[bobAddress].amount,
+            claims[aliceAddress].proof
+          )
+        ).to.be.revertedWith("invalid proof")
+      })
+    })
+
+    context("when users claim already claimed proof", async () => {
+      it("should revert", async () => {
+        await alpies.claimAlpies(
+          claims[aliceAddress].index,
+          aliceAddress,
+          claims[aliceAddress].amount,
+          claims[aliceAddress].proof
+        )
+
+        await expect(
+          alpies.claimAlpies(
+            claims[aliceAddress].index,
+            aliceAddress,
+            claims[aliceAddress].amount,
+            claims[aliceAddress].proof
+          )
+        ).to.be.revertedWith("already claimed")
+      })
+    })
+
+    context("when users claim alpies with valid proof", async () => {
+      it("should work", async () => {
+        const claimableUsers = [aliceAddress, bobAddress, eveAddress]
+        let lastTokenId = 0
+        let totalClaimedAlpies = 0
+
+        for (const claimableUser of claimableUsers) {
+          const claimTx = await alpies.claimAlpies(
+            claims[claimableUser].index,
+            claimableUser,
+            claims[claimableUser].amount,
+            claims[claimableUser].proof
+          )
+          totalClaimedAlpies += Number(claims[claimableUser].amount)
+          for (let i = 0; i < Number(claims[claimableUser].amount); i++) {
+            expect(claimTx).to.emit(alpies, "LogMint").withArgs(claimableUser, lastTokenId)
+            lastTokenId++
+          }
+          expect(claimTx)
+            .to.emit(alpies, "LogClaim")
+            .withArgs(claims[claimableUser].index, claimableUser, claims[claimableUser].amount)
+          expect(await alpies.balanceOf(claimableUser)).to.be.eq(claims[claimableUser].amount)
+          expect(await alpies.claimableAlpies()).to.be.eq(CLAIMABLE_ALPIES.sub(totalClaimedAlpies))
+          expect(await alpies.totalSupply()).to.be.eq(totalClaimedAlpies)
+          expect(await alpies.isClaimed(claims[claimableUser].index)).to.be.eq(true)
+        }
+      })
     })
   })
 
@@ -408,6 +498,7 @@ describe("Alpies", () => {
         context("when user purchase until MAX_ALPIES_PER_ADDRESS", () => {
           it("should not allow user to purchase more than MAX_ALPIES_PER_ADDRESS", async () => {
             // Make gasPrice: 0 possible
+            // Total purchaseable Alpies at this stage = (115 + 5) - 15 - 5 = 100 Alpies
             await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
             const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
             const maxAlpiePerAddress = await alpies.MAX_ALPIES_PER_ADDRESS()
@@ -428,7 +519,7 @@ describe("Alpies", () => {
             await alpiesAsAlice.mint(25, { value: ALPIES_PRICE.mul(25), gasPrice: 0 })
             expect(await alpies.alpieUserPurchased(aliceAddress)).to.eq(85)
 
-            // 15 alpies left. Alice already purchased 85 alpies
+            // only 15 alpies left. Alice already purchased 85 alpies
             // She now have only 5 Alpies quota to mint left
             // alice wants to mint another 15 alpies
             const balanceBefore = await alice.getBalance()
@@ -498,7 +589,9 @@ describe("Alpies", () => {
           await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
           // Make gasPrice: 0 possible
           await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
-          // developer Mint 30 alpies with 95 NTFs left
+
+          // Total purchaseable Alpies: (115 + 5) - 15 - 5 = 100 Alpies
+          // developer Mint 30 Alpies
           let mintAmount = 30
           let currentSupply = await alpies.totalSupply()
           let mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
@@ -511,7 +604,8 @@ describe("Alpies", () => {
             expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
 
-          // alice Mint 30 alpies with 65 NTFs left
+          // Total purchaseable Alpies: (115 + 5) - 15 - 35 = 70 Alpies
+          // Alice Mint 30 Alpies
           currentSupply = await alpies.totalSupply()
           mintTx = await alpiesAsAlice.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
           // expect alpies to emit mint events equal to mint amount
@@ -523,7 +617,8 @@ describe("Alpies", () => {
             expect(mintTx).to.emit(alpies, "LogMint").withArgs(aliceAddress, mintIndex)
           }
 
-          // bob Mint 30 alpies with 35 NTFs left
+          // Total purchaseable Alpies: (115 + 5) - 15 - 65 = 40 Alpies
+          // Bob Mint 30 Alpies
           currentSupply = await alpies.totalSupply()
           mintTx = await alpiesAsBob.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
           // expect alpies to emit LogMint events equal to mint amount
@@ -534,11 +629,12 @@ describe("Alpies", () => {
           ) {
             expect(mintTx).to.emit(alpies, "LogMint").withArgs(bobAddress, mintIndex)
           }
-
           const purchaseWindowSize = await alpies.PURCHASE_WINDOW_SIZE()
           // move block pass developer purchase window
           await advanceBlockTo((await latestBlockNumber()).add(purchaseWindowSize).toNumber())
-          // Mint another 10 to triger sold out
+
+          // Total purchaseable Alpies: (115 + 5) - 15 - 95 = 10 Alpies
+          // Mint another 10 to wipe out purchaseable Alpies
           mintAmount = 10
           currentSupply = await alpies.totalSupply()
           mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
@@ -550,6 +646,42 @@ describe("Alpies", () => {
           ) {
             expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
           }
+
+          // Now purchaseable Alpies all gone: (115 + 5) - 15 - 105 = 0
+          // However, 15 claimable Alpies hasn't claimed yet.
+          // Hence, cannot reveal yet.
+          await expect(alpies.reveal()).to.be.revertedWith("Alpies::reveal:: it's not time yet")
+
+          // Claim all claimable Alpies
+          const claimableUsers = [aliceAddress, bobAddress, eveAddress]
+          let lastTokenId = await alpies.totalSupply()
+          let totalClaimedAlpies = 0
+
+          for (const claimableUser of claimableUsers) {
+            const alpiesBalanceBeforeClaim = await alpies.balanceOf(claimableUser)
+            const totalSupplyBeforeClaim = await alpies.totalSupply()
+            const claimTx = await alpies.claimAlpies(
+              claims[claimableUser].index,
+              claimableUser,
+              claims[claimableUser].amount,
+              claims[claimableUser].proof
+            )
+            totalClaimedAlpies += Number(claims[claimableUser].amount)
+            for (let i = 0; i < Number(claims[claimableUser].amount); i++) {
+              expect(claimTx).to.emit(alpies, "LogMint").withArgs(claimableUser, lastTokenId)
+              lastTokenId = lastTokenId.add(1)
+            }
+            expect(claimTx)
+              .to.emit(alpies, "LogClaim")
+              .withArgs(claims[claimableUser].index, claimableUser, claims[claimableUser].amount)
+            expect(await alpies.balanceOf(claimableUser)).to.be.eq(
+              alpiesBalanceBeforeClaim.add(claims[claimableUser].amount)
+            )
+            expect(await alpies.claimableAlpies()).to.be.eq(CLAIMABLE_ALPIES.sub(totalClaimedAlpies))
+            expect(await alpies.totalSupply()).to.be.eq(totalSupplyBeforeClaim.add(claims[claimableUser].amount))
+          }
+
+          // Reveal should work now as purchaseable + claimable alpies are wiped out.
           const revealTx = await alpiesAsAlice.reveal()
           const startingIndex = await alpiesAsAlice.startingIndex()
           expect(revealTx).to.emit(alpies, "LogReveal").withArgs(aliceAddress, startingIndex)

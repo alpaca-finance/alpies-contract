@@ -124,8 +124,8 @@ describe("Rand", () => {
         let fulFillTxReceipt = await fulFillTx.wait()
         let fulfullInfo = fulFillTxReceipt.events!.map((e) => {
           return {
-            rand: e.args![0] as string,
-            owner: e.args![1] as string,
+            owner: e.args![0] as string,
+            rand: e.args![1] as string,
           }
         })
         expect((await rand.ticketInfo(0)).mark).to.be.eq(1)
@@ -152,14 +152,14 @@ describe("Rand", () => {
 
         expect(requestIds.length).to.be.eq(19)
         // Chainlink fulfill with all requestIds with 1...18, the following conditions must be satisfied:
-        // - LogMark should be emitted with (i, aliceAddress)
+        // - LogMark should be emitted with (aliceAddress, i)
         // - ticketInfo[i].mark = 1;
         // - pendingRandom = 1;
         // - whitelistTaken = 19;
         for (let i = 1; i < 19; i++) {
           await expect(rand.rawFulfillRandomness(requestIds[i], i))
             .to.be.emit(rand, "LogMark")
-            .withArgs(i, aliceAddress)
+            .withArgs(aliceAddress, i)
         }
         expect(await rand.pendingRandom()).to.be.eq(1)
         expect(await rand.whitelistTaken()).to.be.eq(19)
@@ -167,7 +167,7 @@ describe("Rand", () => {
         // Chainlink fulfilled with 119 (over the ticket length)
         await expect(rand.rawFulfillRandomness(requestIds[18], 119))
           .to.be.emit(rand, "LogMark")
-          .withArgs(19, aliceAddress)
+          .withArgs(aliceAddress, 19)
         expect(await rand.pendingRandom()).to.be.eq(0)
         expect(await rand.whitelistTaken()).to.be.eq(20)
 

@@ -18,6 +18,7 @@
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
     "test:alpies": "hardhat test --no-compile ./tests/Alpies.test.ts",
+    "test:dreamerAlpies": "hardhat test --no-compile ./tests/DreamerAlpies.test.ts",
     "test:descendingmodel": "hardhat test --no-compile ./tests/DescendingStepModel.test.ts",
     "test:ascendingmodel": "hardhat test --no-compile ./tests/AscendingStepModel.test.ts",
     "test:fixedpricemodel": "hardhat test --no-compile ./tests/FixedPriceModel.test.ts",
