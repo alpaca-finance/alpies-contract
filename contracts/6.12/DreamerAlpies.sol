@@ -127,9 +127,9 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
   function isClaimed(uint256 _index) public view returns (bool) {
     uint256 _claimedWordIndex = _index / 256;
     uint256 _claimedBitIndex = _index % 256;
-    uint256 claimedWord = claimedBitMap[_claimedWordIndex];
+    uint256 _claimedWord = claimedBitMap[_claimedWordIndex];
     uint256 mask = (1 << _claimedBitIndex);
-    return claimedWord & mask == mask;
+    return _claimedWord & mask == mask;
   }
 
   function _setClaimed(uint256 _index) internal {
