@@ -1,16 +1,18 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { parseEther } from "ethers/lib/utils"
-import { ethers } from "hardhat"
-import { DescendingStepModel__factory } from "../../../../../typechain"
+import { ethers, upgrades } from "hardhat"
+import { Alpies, Alpies__factory, DreamerAlpies, DreamerAlpies__factory } from "../../../../typechain"
 
-interface IDescendingStepModelInput {
-  START_BLOCK: string
-  END_BLOCK: string
-  BLOCK_PER_STEP: string
-  PRICE_STEP: string
-  START_PRICE: string
-  PRICE_FLOOR: string
+interface IDreamerAlpiesInput {
+  NAME: string
+  SYMBOL: string
+  MAX_SALE_ALPIES: string
+  REVEAL_BLOCK: string
+  PRICE_MODEL: string
+  MAX_RESERVE: string
+  MAX_PREMINT_AMOUNT: string
+  MERKLE_ROOT: string
+  CLAIMABLE_ALPIES: string
 }
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -24,33 +26,42 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const descendingStepModelInput: IDescendingStepModelInput = {
-    START_BLOCK: "11910350",
-    END_BLOCK: "12111950",
-    BLOCK_PER_STEP: "1200",
-    PRICE_STEP: parseEther("0.1576").toString(),
-    START_PRICE: parseEther("8.88").toString(),
-    PRICE_FLOOR: parseEther("1").toString(),
+  const alpiesInput: IDreamerAlpiesInput = {
+    NAME: "Alpies",
+    SYMBOL: "ALPIES",
+    MAX_SALE_ALPIES: "",
+    REVEAL_BLOCK: "",
+    PRICE_MODEL: "",
+    MAX_RESERVE: "",
+    MAX_PREMINT_AMOUNT: "",
+    MERKLE_ROOT: "",
+    CLAIMABLE_ALPIES: "",
   }
 
-  const DescendingStepModel = (await ethers.getContractFactory(
-    "DescendingStepModel",
+  const Alpies = (await ethers.getContractFactory(
+    "DreamerAlpies",
     (
       await ethers.getSigners()
     )[0]
-  )) as DescendingStepModel__factory
+  )) as DreamerAlpies__factory
 
-  const descendingStepModel = await DescendingStepModel.deploy(
-    descendingStepModelInput.START_BLOCK,
-    descendingStepModelInput.END_BLOCK,
-    descendingStepModelInput.BLOCK_PER_STEP,
-    descendingStepModelInput.PRICE_STEP,
-    descendingStepModelInput.START_PRICE,
-    descendingStepModelInput.PRICE_FLOOR
-  )
+  console.log(`>> Deploying Dreamer Alpies: ${alpiesInput.NAME}`)
 
-  console.log(">> DescendingStepModel is deployed!")
-  console.log("descendingStepModel address", descendingStepModel.address)
+  const alpies = (await upgrades.deployProxy(Alpies, [
+    alpiesInput.NAME,
+    alpiesInput.SYMBOL,
+    alpiesInput.MAX_SALE_ALPIES,
+    alpiesInput.REVEAL_BLOCK,
+    alpiesInput.PRICE_MODEL,
+    alpiesInput.MAX_RESERVE,
+    alpiesInput.MAX_PREMINT_AMOUNT,
+    alpiesInput.MERKLE_ROOT,
+    alpiesInput.CLAIMABLE_ALPIES,
+  ])) as DreamerAlpies
+
+  console.log(">> Dreamer Alpies is deployed!")
+  console.log("Dreamer Alpies address:", alpies.address)
 }
+
 export default func
-func.tags = ["DescendingStepModel"]
+func.tags = ["DreamerAlpies"]
