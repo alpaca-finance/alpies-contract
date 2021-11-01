@@ -30,11 +30,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const alpiesInput: IAlpiesInput = {
     NAME: "Alpies",
     SYMBOL: "ALPIES",
-    MAX_SALE_ALPIES: "",
-    REVEAL_BLOCK: "",
-    PRICE_MODEL: "",
-    MAX_RESERVE: "",
-    MAX_PREMINT_AMOUNT: "",
+    MAX_SALE_ALPIES: "5000",
+    REVEAL_BLOCK: "12112000",
+    PRICE_MODEL: "0xb076AcAadB11782DFac6336b83e785839B293BDf",
+    MAX_RESERVE: "116",
+    MAX_PREMINT_AMOUNT: "125",
   }
 
   const Alpies = (await ethers.getContractFactory("Alpies", (await ethers.getSigners())[0])) as Alpies__factory
