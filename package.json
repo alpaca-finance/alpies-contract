@@ -13,6 +13,10 @@
     "deploy:testnet:descendingStepModel": "hardhat --network testnet deploy --no-compile --reset --tags DescendingStepModel",
     "deploy:testnet:alpies": "hardhat --network testnet deploy --no-compile --reset --tags Alpies",
     "deploy:testnet:rand": "hardhat --network testnet deploy --no-compile --reset --tags Rand",
+    "deploy:rinkeby:ascendingStepModel": "hardhat --network rinkeby deploy --no-compile --reset --tags AscendingStepModel",
+    "deploy:rinkeby:dreamerAlpies": "hardhat --network rinkeby deploy --no-compile --reset --tags DreamerAlpies",
+    "deploy:ethereum:ascendingStepModel": "hardhat --network ethereum deploy --no-compile --reset --tags AscendingStepModel",
+    "deploy:ethereum:dreamerAlpies": "hardhat --network ethereum deploy --no-compile --reset --tags DreamerAlpies",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
@@ -24,6 +28,7 @@
     "test:fixedpricemodel": "hardhat test --no-compile ./tests/FixedPriceModel.test.ts",
     "test:rand": "hardhat test --no-compile ./tests/Rand.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
+    "rinkeby": "hardhat console --no-compile --network rinkeby",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"

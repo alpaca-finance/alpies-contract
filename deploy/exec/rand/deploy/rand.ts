@@ -24,11 +24,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const randInput: IRandInput = {
-    MAX_WHITELIST_SPOT: "20",
-    VRF_COORDINATOR: "0xa555fC018435bef5A13C6c6870a9d4C11DEC329C",
-    LINK: "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
-    KEY_HASH: "0xcaf3c3727e033261d383b315559476f48034c13b18f8cafed4d871abe5049186",
-    VRF_FEE: parseEther("0.1").toString(),
+    MAX_WHITELIST_SPOT: "500",
+    VRF_COORDINATOR: "0x747973a5A2a4Ae1D3a8fDF5479f1514F65Db9C31",
+    LINK: "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
+    KEY_HASH: "0xc251acd21ec4fb7f31bb8868288bfdbaeb4fbfec2df3735ddbd4f7dc8d60103c",
+    VRF_FEE: parseEther("0.2").toString(),
   }
 
   const Rand = (await ethers.getContractFactory("Rand", (await ethers.getSigners())[0])) as Rand__factory

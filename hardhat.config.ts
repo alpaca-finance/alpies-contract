@@ -44,6 +44,14 @@ module.exports = {
       url: process.env.BSC_MAINNET_RPC,
       accounts: [process.env.BSC_MAINNET_PRIVATE_KEY],
     },
+    rinkeby: {
+      url: process.env.ETH_RINKEBY_RPC,
+      accounts: [process.env.ETH_TESTNET_PRIVATE_KEY],
+    },
+    ethereum: {
+      url: process.env.ETH_MAINNET_RPC,
+      accounts: [process.env.ETH_MAINNET_PRIVATE_KEY],
+    },
   },
   namedAccounts: {
     deployer: {
