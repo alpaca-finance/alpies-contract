@@ -38,7 +38,7 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
   uint256 public maxPremintAmount;
 
   uint256 public constant MAX_PURCHASE_PER_WINDOW = 30;
-  uint256 public constant PURCHASE_WINDOW_SIZE = 100;
+  uint256 public constant PURCHASE_WINDOW_SIZE = 20;
 
   uint256 public constant MAX_ALPIES_PER_ADDRESS = 90;
 
