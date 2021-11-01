@@ -138,6 +138,11 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
     claimedBitMap[_claimedWordIndex] = claimedBitMap[_claimedWordIndex] | (1 << _claimedBitIndex);
   }
 
+  /// @dev claim Alpies for whitelsited users.
+  /// @param _index The index in merkle tree
+  /// @param _account The address to claim Alpies
+  /// @param _amount The amount of Alpies to be claimed
+  /// @param _merkleProof The proof
   function claimAlpies(
     uint256 _index,
     address _account,
