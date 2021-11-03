@@ -340,6 +340,27 @@ describe("DreamerAlpies", () => {
             1
           )
         ).to.be.revertedWith("exceeded max supply")
+
+        // whitelist user claim all claimable Alpies
+        await alpies.claimAlpies(
+          claims[aliceAddress].index,
+          aliceAddress,
+          claims[aliceAddress].amount,
+          claims[aliceAddress].proof
+        )
+        await alpies.claimAlpies(
+          claims[bobAddress].index,
+          bobAddress,
+          claims[bobAddress].amount,
+          claims[bobAddress].proof
+        )
+        await alpies.claimAlpies(
+          claims[eveAddress].index,
+          eveAddress,
+          claims[eveAddress].amount,
+          claims[eveAddress].proof
+        )
+        expect(await alpies.totalSupply()).to.be.eq(await alpies.maxAlpies())
       })
     })
   })

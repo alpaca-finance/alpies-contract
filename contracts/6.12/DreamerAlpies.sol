@@ -179,7 +179,7 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
   /// @param _freebieMerkleRoot The root of the freebie merkle tree
   /// @param _revealBlock New block to reveal Alpies
   function stopSale(bytes32 _freebieMerkleRoot, uint256 _revealBlock) external onlyOwner {
-    require(totalSupply() < maxSaleAlpies, "sale done");
+    require(totalSupply() < maxAlpies(), "sale done");
     require(freebieMerkleRoot == 0, "merkle already set");
 
     saleEndBlock = block.number;
