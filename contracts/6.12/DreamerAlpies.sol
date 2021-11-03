@@ -65,6 +65,10 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
 
   mapping(address => PurchaseHistory) public userPurchaseHistory;
 
+  /// @dev states for claim freebies
+  bytes32 public freebieMerkleRoot;
+  mapping(address => uint256) public freebieClaimedCount;
+
   /// @dev event
   event LogMintReserve(address indexed caller, uint256 reserveCount, uint256 mintAmount);
   event LogPreMint(address indexed caller, uint256 reserveCount, uint256 mintAmount);
@@ -73,6 +77,8 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
   event LogReveal(address indexed caller, uint256 indexed startingIndex);
   event LogRefund(address indexed caller, uint256 indexed amount);
   event LogClaim(uint256 index, address account, uint256 amount);
+  event LogClaimFreebie(uint256 index, address account, uint256 amount);
+  event LogStopSale(bytes32 freebieMerkleRoot, uint256 saleEndBlock, uint256 revealBlock);
 
   function initialize(
     string memory _name,
@@ -85,13 +91,12 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
     bytes32 _merkleRoot,
     uint256 _claimableAlpies
   ) public initializer {
-    require(_revealBlock > _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
+    require(_revealBlock >= _priceModel.endBlock(), "Alpies::constructor:: revealBlock < saleEndBlock");
     require(
-      _revealBlock < _priceModel.endBlock().add(100),
+      _revealBlock <= _priceModel.endBlock().add(100),
       "Alpies::constructor:: revealBlock > saleEndBlock + buffer"
     );
-    require(_maxSaleAlpies > _maxReserveAmount, "Alpies::constructor:: _maxSaleAlpies < _maxReserveAmount");
-    require(_maxSaleAlpies > _maxPremintAmount, "Alpies::constructor:: _maxSaleAlpies < _maxPremintAmount");
+    require(_maxSaleAlpies.sub(_claimableAlpies) > _maxPremintAmount, "Alpies::constructor:: bad supply");
 
     OwnableUpgradeable.__Ownable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -168,6 +173,58 @@ contract DreamerAlpies is Initializable, ERC721Upgradeable, ReentrancyGuardUpgra
     _setClaimed(_index);
 
     emit LogClaim(_index, _account, _amount);
+  }
+
+  /// @dev Stop the sale and distribute the unsold Alpies.
+  /// @param _freebieMerkleRoot The root of the freebie merkle tree
+  /// @param _revealBlock New block to reveal Alpies
+
+  function stopSale(bytes32 _freebieMerkleRoot, uint256 _revealBlock) external onlyOwner {
+    require(totalSupply() < maxSaleAlpies, "sale done");
+    require(freebieMerkleRoot == 0, "merkle already set");
+
+    saleEndBlock = block.number;
+    revealBlock = _revealBlock;
+    freebieMerkleRoot = _freebieMerkleRoot;
+
+    emit LogStopSale(freebieMerkleRoot, saleEndBlock, revealBlock);
+  }
+
+  /// @dev Claim freebie Alpies for early buyers.
+  /// @param _index The index in merkle tree
+  /// @param _account The address to claim Alpies
+  /// @param _allocatedAmount The amount of Alpies that can be claimed
+  /// @param _merkleProof The proof
+  /// @param _mintAmount The amount to be minted
+  function claimFreebies(
+    uint256 _index,
+    address _account,
+    uint256 _allocatedAmount,
+    bytes32[] calldata _merkleProof,
+    uint256 _mintAmount
+  ) external {
+    // Check that merkle freebie root is set.
+    require(freebieMerkleRoot != 0, "merkle not set");
+
+    // Verify the merkle proof.
+    bytes32 _node = keccak256(abi.encodePacked(_index, _account, _allocatedAmount));
+    require(MerkleProofUpgradeable.verify(_merkleProof, freebieMerkleRoot, _node), "invalid proof");
+
+    // Verify freebieClaimCount is not exceeded.
+    require(freebieClaimedCount[_account].add(_mintAmount) <= _allocatedAmount, "exceeded max");
+    require(_mintAmount <= maxAlpies().sub(claimableAlpies).sub(totalSupply()), "exceeded max supply");
+
+    // Mint Alpies.
+    for (uint256 i = 0; i < _mintAmount; i++) {
+      uint256 _mintIndex = totalSupply();
+      _mint(_account, _mintIndex);
+      emit LogMint(_account, _mintIndex);
+    }
+
+    // Update freebieClaimCount.
+    freebieClaimedCount[_account] = freebieClaimedCount[_account].add(_mintAmount);
+
+    emit LogClaimFreebie(_index, _account, _mintAmount);
   }
 
   /// @dev set the base uri for the collection

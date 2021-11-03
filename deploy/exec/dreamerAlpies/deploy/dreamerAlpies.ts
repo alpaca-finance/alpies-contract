@@ -29,13 +29,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const alpiesInput: IDreamerAlpiesInput = {
     NAME: "Alpies",
     SYMBOL: "ALPIES",
-    MAX_SALE_ALPIES: "200",
-    REVEAL_BLOCK: "9492520",
-    PRICE_MODEL: "0x54eae3Cb4fB023648E571F4627E1A056fcEb67Da",
-    MAX_RESERVE: "5",
-    MAX_PREMINT_AMOUNT: "5",
-    MERKLE_ROOT: "0x1c10e2797d0fc85a2111afbda2a71aad1ee490e978f4dce9e7cc2518f2008036",
-    CLAIMABLE_ALPIES: "15",
+    MAX_SALE_ALPIES: "5000",
+    REVEAL_BLOCK: "13578420",
+    PRICE_MODEL: "0xb076AcAadB11782DFac6336b83e785839B293BDf",
+    MAX_RESERVE: "26",
+    MAX_PREMINT_AMOUNT: "125",
+    MERKLE_ROOT: "0x31168a64dc901be62d538390f13ef5c9a3a37bd0056c8ae7a5c6db6bb0173398",
+    CLAIMABLE_ALPIES: "1027",
   }
 
   const Alpies = (await ethers.getContractFactory(

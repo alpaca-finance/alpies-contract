@@ -25,12 +25,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const descendingStepModelInput: IAscendingStepModelInput = {
-    START_BLOCK: "9492300",
-    END_BLOCK: "9492500",
-    BLOCK_PER_STEP: "20",
-    PRICE_STEP: parseEther("0.0001").toString(),
-    START_PRICE: parseEther("0.0008").toString(),
-    PRICE_CEIL: parseEther("0.0009").toString(),
+    START_BLOCK: "13538000",
+    END_BLOCK: "13578320",
+    BLOCK_PER_STEP: "120",
+    PRICE_STEP: parseEther("0.005").toString(),
+    START_PRICE: parseEther("0.22").toString(),
+    PRICE_CEIL: parseEther("0.25").toString(),
   }
 
   const AscendingStepModel = (await ethers.getContractFactory(

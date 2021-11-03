@@ -198,6 +198,152 @@ describe("DreamerAlpies", () => {
     })
   })
 
+  describe("#claimFreebies", () => {
+    let freebiesClaims: IClaim
+    let freebiesMerkleRoot: string
+
+    beforeEach(async () => {
+      // mintReserve
+      await alpies.mintReserve(MAX_RESERVE_AMOUNT)
+      // setBirthCert
+      await alpies.setBirthCert(birthCert)
+      // move block forward to pass startBlock
+      await advanceBlockTo((await latestBlockNumber()).add(1000).toNumber())
+      // Make gasPrice: 0 possible
+      await network.provider.send("hardhat_setNextBlockBaseFeePerGas", ["0x0"])
+      // Mint 20 alpies
+      const mintAmount = 20
+      const currentSupply = await alpies.totalSupply()
+      const reserveCount = (await alpies.reserveCount()).toNumber()
+      const mintTx = await alpies.mint(mintAmount, { value: ALPIES_PRICE.mul(mintAmount), gasPrice: 0 })
+
+      expect(await alpies.totalSupply()).to.be.eq(mintAmount + reserveCount)
+      expect(await alpies.balanceOf(deployerAddress)).to.be.eq(mintAmount + reserveCount)
+      // expect alpies to emit LogMint events equal to mint amount
+      for (let mintIndex = currentSupply.toNumber(); mintIndex < currentSupply.toNumber() + mintAmount; mintIndex++) {
+        expect(mintTx).to.emit(alpies, "LogMint").withArgs(deployerAddress, mintIndex)
+      }
+
+      // expect that there is 80 alpies left
+      expect((await alpies.maxAlpies()).sub(await alpies.claimableAlpies()).sub(await alpies.totalSupply())).to.be.eq(
+        80
+      )
+
+      // build Merkle proof for freebies claim
+      // 80 Alpies left but 110 allocations
+      const freebiesMerkleTree = parseBalanceMap({
+        [aliceAddress]: formatBigNumber(60, "purehex"),
+        [bobAddress]: formatBigNumber(30, "purehex"),
+        [eveAddress]: formatBigNumber(20, "purehex"),
+      })
+      freebiesClaims = freebiesMerkleTree.claims
+      freebiesMerkleRoot = freebiesMerkleTree.merkleRoot
+
+      // stop sale
+      await alpies.stopSale(freebiesMerkleRoot, await latestBlockNumber())
+      // expect that reveal block changed
+      expect(await alpies.revealBlock()).to.be.eq((await latestBlockNumber()).sub(1))
+    })
+
+    context("when users try to mint", async () => {
+      it("should revert", async () => {
+        await expect(alpies.mint(1, { value: ALPIES_PRICE.mul(1), gasPrice: 0 })).to.be.revertedWith(
+          "Alpies::mint:: not in sale period"
+        )
+      })
+    })
+
+    context("when users submit invalid proof", async () => {
+      it("should revert", async () => {
+        await expect(
+          alpies.claimFreebies(
+            freebiesClaims[aliceAddress].index,
+            aliceAddress,
+            freebiesClaims[aliceAddress].amount,
+            freebiesClaims[bobAddress].proof,
+            1
+          )
+        ).to.be.revertedWith("invalid proof")
+      })
+    })
+
+    context("when users claim more than what they get assigned", async () => {
+      it("should revert", async () => {
+        // Alice try claim 61 freebies, however she only has 60 freebies
+        await expect(
+          alpies.claimFreebies(
+            freebiesClaims[aliceAddress].index,
+            aliceAddress,
+            freebiesClaims[aliceAddress].amount,
+            freebiesClaims[aliceAddress].proof,
+            61
+          )
+        ).to.be.revertedWith("exceeded max")
+
+        // Bob claim 30 freebies, Bob should get it
+        await alpies.claimFreebies(
+          freebiesClaims[bobAddress].index,
+          bobAddress,
+          freebiesClaims[bobAddress].amount,
+          freebiesClaims[bobAddress].proof,
+          30
+        )
+        expect(await alpies.balanceOf(bobAddress)).to.be.eq(30)
+        expect(await alpies.freebieClaimedCount(bobAddress)).to.be.eq(30)
+
+        // Bob try to claim 1 more freebie, this should revert
+        await expect(
+          alpies.claimFreebies(
+            freebiesClaims[bobAddress].index,
+            bobAddress,
+            freebiesClaims[bobAddress].amount,
+            freebiesClaims[bobAddress].proof,
+            1
+          )
+        ).to.be.revertedWith("exceeded max")
+      })
+    })
+
+    context("when Eve comes to claim when all supply left gone", async () => {
+      it("should revert", async () => {
+        // Alice claim 60 freebies, Alice should get it
+        alpies.claimFreebies(
+          freebiesClaims[aliceAddress].index,
+          aliceAddress,
+          freebiesClaims[aliceAddress].amount,
+          freebiesClaims[aliceAddress].proof,
+          60
+        )
+        expect(await alpies.balanceOf(aliceAddress)).to.be.eq(60)
+        expect(await alpies.freebieClaimedCount(aliceAddress)).to.be.eq(60)
+
+        // Bob claim 20 freebies, Bob should get it
+        await alpies.claimFreebies(
+          freebiesClaims[bobAddress].index,
+          bobAddress,
+          freebiesClaims[bobAddress].amount,
+          freebiesClaims[bobAddress].proof,
+          20
+        )
+        expect(await alpies.balanceOf(bobAddress)).to.be.eq(20)
+        expect(await alpies.freebieClaimedCount(bobAddress)).to.be.eq(20)
+
+        expect((await alpies.totalSupply()).add(CLAIMABLE_ALPIES)).to.be.eq(await alpies.maxAlpies())
+
+        // Eve try to claim 1 more freebie, this should revert
+        await expect(
+          alpies.claimFreebies(
+            freebiesClaims[eveAddress].index,
+            eveAddress,
+            freebiesClaims[eveAddress].amount,
+            freebiesClaims[eveAddress].proof,
+            1
+          )
+        ).to.be.revertedWith("exceeded max supply")
+      })
+    })
+  })
+
   describe("#maxAlpies", () => {
     context("When alpies are preminted", async () => {
       it("should return correct maximum amount of alpies", async () => {
