@@ -50,7 +50,12 @@ module.exports = {
     },
     ethereum: {
       url: process.env.ETH_MAINNET_RPC,
-      accounts: [process.env.ETH_MAINNET_PRIVATE_KEY],
+      accounts: [process.env.ETH_MAINNET_PRIVATE_KEY, process.env.ETH_MAIN_DEPLOYER_PRIVATE_KEY],
+    },
+    ethereum_mainnet_fork: {
+      url: "http://127.0.0.1:8545",
+      accounts: [process.env.ETH_MAINNET_PRIVATE_KEY, process.env.ETH_MAIN_DEPLOYER_PRIVATE_KEY],
+      timeout: 500000,
     },
   },
   namedAccounts: {
